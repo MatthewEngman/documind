@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from app.config import settings
 from app.database.redis_client import redis_client
@@ -42,10 +43,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# Configure CORS - Production-ready configuration
+allowed_origins = [
+    "https://*.vercel.app",  # All Vercel deployments
+    "http://localhost:3000",  # Local development
+    "http://127.0.0.1:3000",  # Local development
+]
+
+# Add environment-specific origins
+if os.getenv("FRONTEND_URL"):
+    allowed_origins.append(os.getenv("FRONTEND_URL"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
