@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     redis_password: Optional[str] = None
     redis_ssl: bool = False
     redis_decode_responses: bool = True
+    redis_required: bool = True
     
     # API Configuration
     api_host: str = "0.0.0.0"

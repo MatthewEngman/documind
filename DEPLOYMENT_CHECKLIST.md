@@ -4,7 +4,10 @@
 
 ### ✅ Pre-Deployment Setup (COMPLETED)
 - [x] **Railway Configuration Created** - `backend/railway.json`
-- [x] **Railway Configuration Updated** - Switched from `nixpacks.toml` to `railway.toml` for better Railway compatibility
+- [x] **Railway Configuration Updated** - Using both `nixpacks.toml` (build config) and `railway.toml` (deployment config) for Railway compatibility
+- [x] **Railway Service Settings Required** - Root directory must be set to `backend` through Railway's service settings UI (Settings tab → Root Directory), not config files
+- [x] **Nixpacks Automatic Python Handling** - Removed custom virtual environment configuration to let nixpacks handle Python dependencies automatically
+- [x] **Google Cloud Run Alternative** - Created Dockerfile and Cloud Run deployment configuration as simpler alternative to Railway
 - [x] **Vercel Configuration Created** - `documind-frontend/vercel.json`
 - [x] **Production Environment File Created** - `documind-frontend/.env.production`
 - [x] **CORS Configuration Updated** - Production-ready CORS in `backend/app/main.py`

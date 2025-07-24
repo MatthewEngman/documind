@@ -19,16 +19,26 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting DocuMind API...")
     
-    # Verify Redis connection
-    if not redis_client.health_check():
-        raise Exception("Redis connection failed during startup")
+    redis_required = os.getenv("REDIS_REQUIRED", "true").lower() == "true"
     
-    # Initialize vector search service
-    try:
-        await vector_search_service.initialize_vector_index()
-        logger.info("📊 Vector search service initialized")
-    except Exception as e:
-        logger.warning(f"Vector index initialization failed: {e}")
+    # Verify Redis connection
+    redis_healthy = redis_client.health_check()
+    if redis_required and not redis_healthy:
+        raise Exception("Redis connection failed during startup")
+    elif not redis_healthy:
+        logger.warning("⚠️ Redis connection failed - running in degraded mode")
+    else:
+        logger.info("✅ Redis connection established")
+    
+    # Initialize vector search service (only if Redis is available)
+    if redis_healthy:
+        try:
+            await vector_search_service.initialize_vector_index()
+            logger.info("📊 Vector search service initialized")
+        except Exception as e:
+            logger.warning(f"Vector index initialization failed: {e}")
+    else:
+        logger.info("📊 Skipping vector search initialization (Redis unavailable)")
     
     yield
     
