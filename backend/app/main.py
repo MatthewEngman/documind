@@ -51,8 +51,9 @@ allowed_origins = [
 ]
 
 # Add environment-specific origins
-if os.getenv("FRONTEND_URL"):
-    allowed_origins.append(os.getenv("FRONTEND_URL"))
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    allowed_origins.append(frontend_url)
 
 app.add_middleware(
     CORSMiddleware,
@@ -103,9 +104,12 @@ async def get_system_stats():
         redis_stats = redis_client.get_stats()
         
         # Get document statistics
-        total_docs = redis_client.client.scard("doc:index") or 0
-        processed_docs = redis_client.client.get("stats:documents_processed") or 0
-        chunks_created = redis_client.client.get("stats:chunks_created") or 0
+        if redis_client.client:
+            total_docs = redis_client.client.scard("doc:index") or 0
+            processed_docs = redis_client.client.get("stats:documents_processed") or 0
+            chunks_created = redis_client.client.get("stats:chunks_created") or 0
+        else:
+            total_docs = processed_docs = chunks_created = 0
         
         return {
             "system": {
