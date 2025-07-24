@@ -111,6 +111,43 @@ class DocumentProcessor:
             redis_client.client.incr("stats:documents_processed")
             redis_client.client.incrby("stats:chunks_created", len(chunks))
             
+            # Step 6: Generate and store vectors
+            try:
+                self._update_status(doc_id, "generating_vectors", 85)
+                
+                # Prepare chunks data for vector generation
+                chunks_data = []
+                for chunk in chunks:
+                    chunk_data = {
+                        "chunk_id": chunk["id"],
+                        "doc_id": doc_id,
+                        "text": chunk["text"],
+                        "start_char": chunk["start_char"],
+                        "end_char": chunk["end_char"],
+                        "word_count": chunk["word_count"],
+                        "chunk_index": chunk["chunk_index"],
+                        "metadata": chunk["metadata"],
+                        "title": document["title"],
+                        "filename": document["filename"],
+                        "tags": document.get("tags", []),
+                        "upload_date": document["created_at"]
+                    }
+                    chunks_data.append(chunk_data)
+                
+                # Generate and store vectors
+                vectors_added = await vector_search_service.add_document_vectors(doc_id, chunks_data)
+                document["vectors_generated"] = vectors_added
+                
+                logger.info(f"Generated {vectors_added} vectors for document {doc_id}")
+                
+                # Update document with vector info
+                redis_client.set_json(f"doc:{doc_id}", document)
+                
+            except Exception as e:
+                logger.error(f"Vector generation failed for {doc_id}: {e}")
+                document["vector_error"] = str(e)
+                redis_client.set_json(f"doc:{doc_id}", document)
+            
             # Step 7: Complete processing
             self._update_status(doc_id, "completed", 100)
             processing_time = (datetime.utcnow() - start_time).total_seconds()
@@ -263,7 +300,62 @@ class DocumentProcessor:
             # This is a simplified cleanup
             
         except Exception as e:
-            logger.error(f"Cleanup failed for {doc_id}: {e}")
+            logger.error(f"Failed cleanup for {doc_id}: {e}")
+    
+    async def delete_document(self, doc_id: str) -> bool:
+        """Delete document and all associated data including vectors"""
+        try:
+            # Get document metadata first
+            doc_key = f"doc:{doc_id}"
+            document = redis_client.get_json(doc_key)
+            
+            if not document:
+                logger.warning(f"Document {doc_id} not found for deletion")
+                return False
+            
+            # Delete vectors FIRST
+            try:
+                await vector_search_service.delete_document_vectors(doc_id)
+                logger.info(f"Deleted vectors for document {doc_id}")
+            except Exception as e:
+                logger.error(f"Failed to delete vectors for {doc_id}: {e}")
+            
+            # Delete file from storage
+            if "file_path" in document:
+                try:
+                    await file_handler.delete_file(document["file_path"])
+                    logger.info(f"Deleted file: {document['file_path']}")
+                except Exception as e:
+                    logger.error(f"Failed to delete file {document['file_path']}: {e}")
+            
+            # Get chunks to delete
+            chunks_key = f"doc:chunks:{doc_id}"
+            chunks_data = redis_client.get_json(chunks_key)
+            
+            if chunks_data and "chunks" in chunks_data:
+                # Delete individual chunks
+                for chunk_id in chunks_data["chunks"]:
+                    redis_client.client.delete(f"doc:chunk:{chunk_id}")
+                logger.info(f"Deleted {len(chunks_data['chunks'])} chunks for document {doc_id}")
+            
+            # Delete document metadata
+            redis_client.client.delete(doc_key)
+            
+            # Delete chunks index
+            redis_client.client.delete(chunks_key)
+            
+            # Remove from document index
+            redis_client.client.srem("doc:index", doc_id)
+            
+            # Update analytics
+            redis_client.client.incr("stats:documents_deleted")
+            
+            logger.info(f"Document {doc_id} deleted successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting document {doc_id}: {e}")
+            return False
     
     def get_processing_status(self, doc_id: str) -> Optional[Dict]:
         """Get processing status for a document"""

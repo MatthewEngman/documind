@@ -98,17 +98,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
   return (
     <div className="space-y-6">
       {/* Drop zone */}
-      <motion.div
+      <div
         {...getRootProps()}
         className={`
           relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
-          ${isDragActive 
-            ? 'border-primary-500 bg-primary-50' 
-            : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
-          }
+          ${isDragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-gray-400'}
         `}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
       >
         <input {...getInputProps()} />
         
@@ -134,7 +129,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
             </p>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Upload progress */}
       <AnimatePresence>
