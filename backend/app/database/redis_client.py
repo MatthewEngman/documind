@@ -14,11 +14,11 @@ class RedisClient:
     def connect(self):
         """Establish Redis connection with retry logic"""
         try:
-            self.client = redis.Redis(
-                host=settings.redis_host,
-                port=settings.redis_port,
-                password=settings.redis_password,
-                ssl=settings.redis_ssl,
+            # Use Redis URL matching the working CLI command format
+            redis_url = f"redis://default:{settings.redis_password}@{settings.redis_host}:{settings.redis_port}"
+            
+            self.client = redis.from_url(
+                redis_url,
                 decode_responses=settings.redis_decode_responses,
                 socket_connect_timeout=10,
                 socket_timeout=10,
