@@ -9,6 +9,7 @@ from app.services.file_handler import file_handler
 from app.services.text_extractor import text_extractor
 from app.services.text_chunker import text_chunker
 from app.services.embedding_service import embedding_service
+from app.services.vector_search_service import vector_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,16 @@ class DocumentProcessor:
             if not chunks:
                 raise ValueError("No valid chunks created from document")
             
-            # Step 5: Store document metadata
+            # Step 5: Generate and store vectors
+            self._update_status(doc_id, "generating_vectors", 65)
+            try:
+                vectors_added = await vector_search_service.add_document_vectors(doc_id, chunks)
+                logger.info(f"Generated {vectors_added} vectors for document {doc_id}")
+            except Exception as e:
+                logger.warning(f"Vector generation failed for {doc_id}: {e}")
+                # Continue processing even if vector generation fails
+            
+            # Step 6: Store document metadata
             self._update_status(doc_id, "storing", 75)
             document = {
                 "id": doc_id,
@@ -101,7 +111,7 @@ class DocumentProcessor:
             redis_client.client.incr("stats:documents_processed")
             redis_client.client.incrby("stats:chunks_created", len(chunks))
             
-            # Step 6: Complete processing
+            # Step 7: Complete processing
             self._update_status(doc_id, "completed", 100)
             processing_time = (datetime.utcnow() - start_time).total_seconds()
             

@@ -1,257 +1,281 @@
-"""
-Embedding service for generating vector embeddings
-"""
-import logging
-from typing import List, Dict, Any, Optional
+import openai
 import numpy as np
-from datetime import datetime
+from typing import List, Dict, Optional, Tuple, Any
+import logging
 import hashlib
+import json
+import asyncio
+from datetime import datetime
+import time
 
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 class EmbeddingService:
-    """Service for generating and managing document embeddings"""
+    """Generate and manage document embeddings"""
     
     def __init__(self):
-        self.model_name = settings.embedding_model
-        self.embedding_dim = settings.embedding_dimensions
-        self._model = None
-        self._initialize_model()
+        self.openai_client = None
+        self.local_model = None
+        self.embedding_cache = {}  # Simple in-memory cache
+        
+        # Initialize based on configuration
+        self._initialize_providers()
     
-    def _initialize_model(self):
-        """Initialize the embedding model"""
+    def _initialize_providers(self):
+        """Initialize embedding providers"""
         try:
-            # Try to use OpenAI embeddings if API key is available
+            # Initialize OpenAI if API key is available
             if settings.openai_api_key:
-                self._init_openai_embeddings()
+                self.openai_client = openai.OpenAI(api_key=settings.openai_api_key)
+                logger.info("✅ OpenAI embedding service initialized")
             else:
-                # Fallback to sentence-transformers
-                self._init_sentence_transformers()
+                logger.info("⚠️ OpenAI API key not found, using local models only")
+            
+            # Initialize local model as fallback
+            if SENTENCE_TRANSFORMERS_AVAILABLE:
+                try:
+                    self.local_model = SentenceTransformer('all-MiniLM-L6-v2')
+                    logger.info("✅ Local embedding model loaded (all-MiniLM-L6-v2)")
+                except Exception as e:
+                    logger.warning(f"Local model initialization failed: {e}")
+            else:
+                logger.warning("sentence-transformers not available, install for local embeddings")
                 
         except Exception as e:
-            logger.error(f"Failed to initialize embedding model: {e}")
-            # Use dummy embeddings as fallback
-            self._model = "dummy"
-            logger.warning("Using dummy embeddings - install proper embedding model for production")
+            logger.error(f"Embedding service initialization failed: {e}")
     
-    def _init_openai_embeddings(self):
-        """Initialize OpenAI embeddings"""
+    async def generate_embedding(self, text: str, method: str = "auto") -> Dict:
+        """Generate embedding for text"""
         try:
-            import openai
-            openai.api_key = settings.openai_api_key
-            self._model = "openai"
-            logger.info("Initialized OpenAI embeddings")
-        except ImportError:
-            logger.warning("OpenAI package not installed, falling back to sentence-transformers")
-            self._init_sentence_transformers()
-    
-    def _init_sentence_transformers(self):
-        """Initialize sentence-transformers model"""
-        try:
-            from sentence_transformers import SentenceTransformer
-            # Use a lightweight model for development
-            model_name = "all-MiniLM-L6-v2"  # 384 dimensions, fast and efficient
-            self._model = SentenceTransformer(model_name)
-            self.embedding_dim = 384  # Update dimension for this model
-            logger.info(f"Initialized sentence-transformers model: {model_name}")
-        except ImportError:
-            logger.warning("sentence-transformers not installed, using dummy embeddings")
-            self._model = "dummy"
-    
-    async def generate_embedding(self, text: str) -> List[float]:
-        """
-        Generate embedding for a single text
-        """
-        try:
-            if not text or not text.strip():
-                return [0.0] * self.embedding_dim
+            # Clean and prepare text
+            clean_text = self._prepare_text(text)
             
-            if self._model == "openai":
-                return await self._generate_openai_embedding(text)
-            elif hasattr(self._model, 'encode'):
-                return await self._generate_sentence_transformer_embedding(text)
+            # Check cache first
+            cache_key = self._get_cache_key(clean_text, method)
+            if cache_key in self.embedding_cache:
+                logger.debug("Cache hit for embedding")
+                return self.embedding_cache[cache_key]
+            
+            # Generate embedding based on method
+            if method == "auto":
+                method = "openai" if self.openai_client else "local"
+            
+            start_time = time.time()
+            
+            if method == "openai" and self.openai_client:
+                result = await self._generate_openai_embedding(clean_text)
+            elif method == "local" and self.local_model:
+                result = await self._generate_local_embedding(clean_text)
             else:
-                return self._generate_dummy_embedding(text)
-                
+                raise ValueError(f"Embedding method '{method}' not available")
+            
+            generation_time = time.time() - start_time
+            
+            # Add metadata
+            result.update({
+                "method": method,
+                "generation_time": generation_time,
+                "text_length": len(clean_text),
+                "cache_key": cache_key
+            })
+            
+            # Cache result
+            self.embedding_cache[cache_key] = result
+            
+            logger.debug(f"Generated embedding: {method}, {len(result['vector'])}D, {generation_time:.2f}s")
+            return result
+            
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
-            return self._generate_dummy_embedding(text)
+            raise
     
-    async def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """
-        Generate embeddings for multiple texts efficiently
-        """
+    async def generate_batch_embeddings(self, texts: List[str], method: str = "auto", batch_size: int = 10) -> List[Dict]:
+        """Generate embeddings for multiple texts efficiently"""
         try:
-            if not texts:
-                return []
+            results = []
             
-            # Filter out empty texts
-            valid_texts = [text for text in texts if text and text.strip()]
-            if not valid_texts:
-                return [[0.0] * self.embedding_dim] * len(texts)
-            
-            if self._model == "openai":
-                return await self._generate_openai_embeddings_batch(valid_texts)
-            elif hasattr(self._model, 'encode'):
-                return await self._generate_sentence_transformer_embeddings_batch(valid_texts)
-            else:
-                return [self._generate_dummy_embedding(text) for text in valid_texts]
+            # Process in batches to avoid rate limits
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i:i + batch_size]
+                logger.info(f"Processing embedding batch {i//batch_size + 1}/{(len(texts)-1)//batch_size + 1}")
                 
+                # Generate embeddings for batch
+                if method == "openai" and self.openai_client:
+                    batch_results = await self._generate_openai_batch(batch)
+                elif method == "local" and self.local_model:
+                    batch_results = await self._generate_local_batch(batch)
+                else:
+                    # Fallback to individual generation
+                    batch_results = []
+                    for text in batch:
+                        result = await self.generate_embedding(text, method)
+                        batch_results.append(result)
+                
+                results.extend(batch_results)
+                
+                # Small delay to respect rate limits
+                if method == "openai":
+                    await asyncio.sleep(0.1)
+            
+            logger.info(f"Generated {len(results)} embeddings in batches")
+            return results
+            
         except Exception as e:
             logger.error(f"Batch embedding generation failed: {e}")
-            return [self._generate_dummy_embedding(text) for text in texts]
+            raise
     
-    async def _generate_openai_embedding(self, text: str) -> List[float]:
-        """Generate embedding using OpenAI API"""
+    async def _generate_openai_embedding(self, text: str) -> Dict:
+        """Generate OpenAI embedding"""
         try:
-            import openai
-            
-            response = await openai.Embedding.acreate(
-                model=self.model_name,
-                input=text.replace("\n", " ")
+            response = await asyncio.to_thread(
+                self.openai_client.embeddings.create,
+                model=settings.embedding_model,
+                input=text,
+                dimensions=settings.embedding_dimensions
             )
             
-            return response['data'][0]['embedding']
+            return {
+                "vector": response.data[0].embedding,
+                "model": settings.embedding_model,
+                "dimensions": len(response.data[0].embedding),
+                "usage": response.usage.total_tokens if hasattr(response, 'usage') else None
+            }
             
         except Exception as e:
             logger.error(f"OpenAI embedding failed: {e}")
-            return self._generate_dummy_embedding(text)
+            raise
     
-    async def _generate_openai_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings using OpenAI API in batch"""
+    async def _generate_openai_batch(self, texts: List[str]) -> List[Dict]:
+        """Generate OpenAI embeddings in batch"""
         try:
-            import openai
-            
-            # Clean texts
-            cleaned_texts = [text.replace("\n", " ") for text in texts]
-            
-            response = await openai.Embedding.acreate(
-                model=self.model_name,
-                input=cleaned_texts
+            response = await asyncio.to_thread(
+                self.openai_client.embeddings.create,
+                model=settings.embedding_model,
+                input=texts,
+                dimensions=settings.embedding_dimensions
             )
             
-            return [item['embedding'] for item in response['data']]
+            results = []
+            for i, embedding_data in enumerate(response.data):
+                results.append({
+                    "vector": embedding_data.embedding,
+                    "model": settings.embedding_model,
+                    "dimensions": len(embedding_data.embedding),
+                    "usage": response.usage.total_tokens // len(texts) if hasattr(response, 'usage') else None,
+                    "batch_index": i
+                })
+            
+            return results
             
         except Exception as e:
             logger.error(f"OpenAI batch embedding failed: {e}")
-            return [self._generate_dummy_embedding(text) for text in texts]
+            raise
     
-    async def _generate_sentence_transformer_embedding(self, text: str) -> List[float]:
-        """Generate embedding using sentence-transformers"""
+    async def _generate_local_embedding(self, text: str) -> Dict:
+        """Generate local embedding using SentenceTransformers"""
         try:
-            embedding = self._model.encode(text, convert_to_tensor=False)
-            return embedding.tolist()
+            # Run in thread to avoid blocking
+            vector = await asyncio.to_thread(
+                self.local_model.encode,
+                text,
+                normalize_embeddings=True
+            )
+            
+            return {
+                "vector": vector.tolist(),
+                "model": "all-MiniLM-L6-v2",
+                "dimensions": len(vector),
+                "usage": None
+            }
             
         except Exception as e:
-            logger.error(f"Sentence transformer embedding failed: {e}")
-            return self._generate_dummy_embedding(text)
+            logger.error(f"Local embedding failed: {e}")
+            raise
     
-    async def _generate_sentence_transformer_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings using sentence-transformers in batch"""
+    async def _generate_local_batch(self, texts: List[str]) -> List[Dict]:
+        """Generate local embeddings in batch"""
         try:
-            embeddings = self._model.encode(texts, convert_to_tensor=False)
-            return embeddings.tolist()
+            vectors = await asyncio.to_thread(
+                self.local_model.encode,
+                texts,
+                normalize_embeddings=True,
+                batch_size=32
+            )
+            
+            results = []
+            for i, vector in enumerate(vectors):
+                results.append({
+                    "vector": vector.tolist(),
+                    "model": "all-MiniLM-L6-v2", 
+                    "dimensions": len(vector),
+                    "usage": None,
+                    "batch_index": i
+                })
+            
+            return results
             
         except Exception as e:
-            logger.error(f"Sentence transformer batch embedding failed: {e}")
-            return [self._generate_dummy_embedding(text) for text in texts]
+            logger.error(f"Local batch embedding failed: {e}")
+            raise
     
-    def _generate_dummy_embedding(self, text: str) -> List[float]:
-        """Generate a dummy embedding based on text hash (for development/testing)"""
-        try:
-            # Create a deterministic embedding based on text hash
-            text_hash = hashlib.md5(text.encode()).hexdigest()
-            
-            # Convert hash to numbers and normalize
-            hash_numbers = [int(text_hash[i:i+2], 16) for i in range(0, min(len(text_hash), 32), 2)]
-            
-            # Pad or truncate to desired dimension
-            if len(hash_numbers) < self.embedding_dim:
-                hash_numbers.extend([0] * (self.embedding_dim - len(hash_numbers)))
-            else:
-                hash_numbers = hash_numbers[:self.embedding_dim]
-            
-            # Normalize to [-1, 1] range
-            normalized = [(x - 127.5) / 127.5 for x in hash_numbers]
-            
-            return normalized
-            
-        except Exception as e:
-            logger.error(f"Dummy embedding generation failed: {e}")
-            return [0.0] * self.embedding_dim
+    def _prepare_text(self, text: str, max_length: int = 8192) -> str:
+        """Prepare text for embedding generation"""
+        # Remove excessive whitespace
+        clean_text = ' '.join(text.split())
+        
+        # Truncate if too long (OpenAI has token limits)
+        if len(clean_text) > max_length:
+            clean_text = clean_text[:max_length] + "..."
+            logger.debug(f"Text truncated to {max_length} characters")
+        
+        return clean_text
     
-    def calculate_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
-        """
-        Calculate cosine similarity between two embeddings
-        """
+    def _get_cache_key(self, text: str, method: str) -> str:
+        """Generate cache key for embedding"""
+        content = f"{method}:{text}"
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    def calculate_similarity(self, vector1: List[float], vector2: List[float]) -> float:
+        """Calculate cosine similarity between vectors"""
         try:
-            if len(embedding1) != len(embedding2):
-                logger.warning("Embedding dimensions don't match")
+            v1 = np.array(vector1)
+            v2 = np.array(vector2)
+            
+            # Cosine similarity
+            dot_product = np.dot(v1, v2)
+            norms = np.linalg.norm(v1) * np.linalg.norm(v2)
+            
+            if norms == 0:
                 return 0.0
             
-            # Convert to numpy arrays
-            vec1 = np.array(embedding1)
-            vec2 = np.array(embedding2)
-            
-            # Calculate cosine similarity
-            dot_product = np.dot(vec1, vec2)
-            norm1 = np.linalg.norm(vec1)
-            norm2 = np.linalg.norm(vec2)
-            
-            if norm1 == 0 or norm2 == 0:
-                return 0.0
-            
-            similarity = dot_product / (norm1 * norm2)
-            
-            # Ensure similarity is in [0, 1] range
-            return max(0.0, min(1.0, (similarity + 1) / 2))
+            similarity = dot_product / norms
+            return float(similarity)
             
         except Exception as e:
             logger.error(f"Similarity calculation failed: {e}")
             return 0.0
     
-    def get_model_info(self) -> Dict[str, Any]:
-        """
-        Get information about the current embedding model
-        """
+    def get_embedding_stats(self) -> Dict:
+        """Get embedding service statistics"""
         return {
-            "model_type": "openai" if self._model == "openai" else "sentence_transformer" if hasattr(self._model, 'encode') else "dummy",
-            "model_name": self.model_name if self._model == "openai" else getattr(self._model, 'model_name', 'unknown') if hasattr(self._model, 'encode') else "dummy",
-            "embedding_dimension": self.embedding_dim,
-            "initialized": self._model is not None,
-            "timestamp": datetime.utcnow().isoformat()
+            "cache_size": len(self.embedding_cache),
+            "openai_available": self.openai_client is not None,
+            "local_model_available": self.local_model is not None,
+            "default_method": "openai" if self.openai_client else "local"
         }
     
-    async def embed_document_chunks(self, chunks: List[str], document_id: str) -> List[Dict[str, Any]]:
-        """
-        Generate embeddings for document chunks and return structured data
-        """
-        try:
-            if not chunks:
-                return []
-            
-            # Generate embeddings for all chunks
-            embeddings = await self.generate_embeddings_batch(chunks)
-            
-            # Structure the data
-            embedded_chunks = []
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                embedded_chunks.append({
-                    "document_id": document_id,
-                    "chunk_index": i,
-                    "text": chunk,
-                    "embedding": embedding,
-                    "embedding_model": self.get_model_info()["model_name"],
-                    "created_at": datetime.utcnow().isoformat()
-                })
-            
-            return embedded_chunks
-            
-        except Exception as e:
-            logger.error(f"Document chunk embedding failed: {e}")
-            return []
+    def clear_cache(self):
+        """Clear embedding cache"""
+        self.embedding_cache.clear()
+        logger.info("Embedding cache cleared")
 
 # Global instance
 embedding_service = EmbeddingService()

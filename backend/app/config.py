@@ -34,6 +34,20 @@ class Settings(BaseSettings):
     cache_ttl: int = 3600  # 1 hour
     max_search_results: int = 50
     
+    # Embedding Configuration
+    embedding_method: str = "auto"  # "openai", "local", or "auto"
+    embedding_batch_size: int = 10
+    embedding_max_text_length: int = 8192
+    
+    # Vector Search Configuration
+    vector_similarity_threshold: float = 0.7
+    vector_search_limit: int = 50
+    
+    # Semantic Search Configuration
+    enable_search_cache: bool = True
+    search_cache_ttl: int = 1800  # 30 minutes
+    search_result_limit: int = 20
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

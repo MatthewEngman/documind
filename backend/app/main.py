@@ -5,7 +5,8 @@ import logging
 
 from app.config import settings
 from app.database.redis_client import redis_client
-from app.api import documents
+from app.api import documents, search
+from app.services.vector_search_service import vector_search_service
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,10 +22,10 @@ async def lifespan(app: FastAPI):
     if not redis_client.health_check():
         raise Exception("Redis connection failed during startup")
     
-    # Initialize vector index (placeholder)
+    # Initialize vector search service
     try:
-        # We'll implement this in the next phase
-        logger.info("📊 Vector index initialization skipped for now")
+        await vector_search_service.initialize_vector_index()
+        logger.info("📊 Vector search service initialized")
     except Exception as e:
         logger.warning(f"Vector index initialization failed: {e}")
     
@@ -81,6 +82,7 @@ async def get_redis_stats():
 
 # Include routers
 app.include_router(documents.router)
+app.include_router(search.router)
 
 # System statistics endpoint
 @app.get("/api/system/stats")
