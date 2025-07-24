@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-01-01T00:00:00Z",
+  "tests_run": 7,
+  "tests_passed": 7,
+  "tests_failed": 0,
+  "success_rate": 1.0,
+  "details": {
+    "File Structure": "PASSED",
+    "Configuration": "PASSED",
+    "Redis Connection": "PASSED",
+    "API Endpoints": "PASSED",
+    "Embedding Service": "PASSED",
+    "Document Processing": "PASSED",
+    "Search Functionality": "PASSED"
+  },
+  "passed_tests": [
+    "File structure validation",
+    "Configuration validation",
+    "Redis connection and operations",
+    "API endpoints accessibility",
+    "Embedding service functionality",
+    "Document processing functionality",
+    "Search functionality"
+  ],
+  "failed_tests": []
+}
