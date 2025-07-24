@@ -5,7 +5,8 @@
 ### ✅ Pre-Deployment Setup (COMPLETED)
 - [x] **Railway Configuration Created** - `backend/railway.json`
 - [x] **Railway Configuration Updated** - Using both `nixpacks.toml` (build config) and `railway.toml` (deployment config) for Railway compatibility
-- [x] **Railway Root Directory Configured** - Set root directory to `backend` in `railway.json` to align build and runtime contexts for monorepo structure
+- [x] **Railway Service Settings Required** - Root directory must be set to `backend` through Railway's service settings UI (Settings tab → Root Directory), not config files
+- [x] **Nixpacks Automatic Python Handling** - Removed custom virtual environment configuration to let nixpacks handle Python dependencies automatically
 - [x] **Vercel Configuration Created** - `documind-frontend/vercel.json`
 - [x] **Production Environment File Created** - `documind-frontend/.env.production`
 - [x] **CORS Configuration Updated** - Production-ready CORS in `backend/app/main.py`
