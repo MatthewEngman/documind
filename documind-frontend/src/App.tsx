@@ -19,10 +19,11 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'upload' | 'search' | 'documents' | 'analytics'>('upload');
+  const [activeTab, setActiveTab] = useState<string>('upload');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+  const [redisStatus, setRedisStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
 
   const handleUploadSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
