@@ -8,36 +8,39 @@ logger = logging.getLogger(__name__)
 
 class RedisClient:
     def __init__(self):
-        self.client = None
-        self.connect()
+        self.client: Optional[redis.Redis] = None
+        self._connected = False
     
     def connect(self):
         """Establish Redis connection with retry logic"""
+        if self._connected and self.client:
+            return
+            
         try:
             # Use Redis URL matching the working CLI command format
             redis_url = f"redis://default:{settings.redis_password}@{settings.redis_host}:{settings.redis_port}"
             
-            self.client = redis.from_url(
-                redis_url,
-                decode_responses=settings.redis_decode_responses,
-                socket_connect_timeout=10,
-                socket_timeout=10,
-                retry_on_timeout=True,
-                health_check_interval=30
-            )
+            self.client = redis.from_url(redis_url)
             
             # Test connection
-            self.client.ping()
+            if self.client:
+                self.client.ping()
+                self._connected = True
             logger.info("✅ Redis connection established successfully")
             
         except Exception as e:
             logger.error(f"❌ Redis connection failed: {e}")
-            raise
+            self.client = None
+            self._connected = False
     
     def health_check(self) -> bool:
         """Check if Redis connection is healthy"""
         try:
-            return self.client.ping()
+            if not self._connected:
+                self.connect()
+            if self.client:
+                return self.client.ping()
+            return False
         except:
             return False
     
@@ -48,6 +51,11 @@ class RedisClient:
             from redis.commands.search.field import VectorField, TextField, NumericField
             from redis.commands.search.indexDefinition import IndexDefinition, IndexType
             
+            if not self._connected:
+                self.connect()
+            if not self.client:
+                raise Exception("Redis client not connected")
+                
             # Check if index exists
             try:
                 self.client.ft(index_name).info()
@@ -70,6 +78,11 @@ class RedisClient:
     def add_document_vector(self, doc_id: str, vector: List[float], metadata: Dict):
         """Add document vector with metadata"""
         try:
+            if not self._connected:
+                self.connect()
+            if not self.client:
+                raise Exception("Redis client not connected")
+                
             # Store as hash for vector search
             key = f"doc:{doc_id}"
             
@@ -87,7 +100,7 @@ class RedisClient:
             logger.error(f"Failed to store document vector: {e}")
             raise
     
-    def search_vectors(self, query_vector: List[float], limit: int = 10, filters: Dict = None):
+    def search_vectors(self, query_vector: List[float], limit: int = 10, filters: Optional[Dict] = None):
         """Search for similar vectors"""
         try:
             # This is a simplified version - you'll enhance this with actual vector search
@@ -112,6 +125,10 @@ class RedisClient:
     def set_json(self, key: str, data: Dict, ttl: Optional[int] = None):
         """Store JSON data"""
         try:
+            if not self._connected:
+                self.connect()
+            if not self.client:
+                raise Exception("Redis client not connected")
             self.client.set(key, json.dumps(data), ex=ttl)
         except Exception as e:
             logger.error(f"Failed to set JSON: {e}")
@@ -120,6 +137,10 @@ class RedisClient:
     def get_json(self, key: str) -> Optional[Dict]:
         """Retrieve JSON data"""
         try:
+            if not self._connected:
+                self.connect()
+            if not self.client:
+                return None
             data = self.client.get(key)
             return json.loads(data) if data else None
         except Exception as e:
@@ -127,7 +148,7 @@ class RedisClient:
             return None
     
     # Cache Operations
-    def cache_search_result(self, query_hash: str, results: List[Dict], ttl: int = None):
+    def cache_search_result(self, query_hash: str, results: List[Dict], ttl: Optional[int] = None):
         """Cache search results"""
         ttl = ttl or settings.cache_ttl
         cache_key = f"cache:search:{query_hash}"
@@ -148,11 +169,19 @@ class RedisClient:
     # Analytics
     def increment_counter(self, key: str, amount: int = 1):
         """Increment analytics counter"""
+        if not self._connected:
+            self.connect()
+        if not self.client:
+            return 0
         return self.client.incr(key, amount)
     
     def get_stats(self) -> Dict:
         """Get Redis usage statistics"""
         try:
+            if not self._connected:
+                self.connect()
+            if not self.client:
+                return {}
             info = self.client.info()
             return {
                 "memory_used": info.get("used_memory_human", "0"),

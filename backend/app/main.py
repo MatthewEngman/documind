@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from app.config import settings
 from app.database.redis_client import redis_client
@@ -42,10 +43,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# Configure CORS - Production-ready configuration
+allowed_origins = [
+    "https://*.vercel.app",  # All Vercel deployments
+    "http://localhost:3000",  # Local development
+    "http://127.0.0.1:3000",  # Local development
+]
+
+# Add environment-specific origins
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,9 +104,12 @@ async def get_system_stats():
         redis_stats = redis_client.get_stats()
         
         # Get document statistics
-        total_docs = redis_client.client.scard("doc:index") or 0
-        processed_docs = redis_client.client.get("stats:documents_processed") or 0
-        chunks_created = redis_client.client.get("stats:chunks_created") or 0
+        if redis_client.client:
+            total_docs = redis_client.client.scard("doc:index") or 0
+            processed_docs = redis_client.client.get("stats:documents_processed") or 0
+            chunks_created = redis_client.client.get("stats:chunks_created") or 0
+        else:
+            total_docs = processed_docs = chunks_created = 0
         
         return {
             "system": {
