@@ -4,7 +4,7 @@
 
 ### ✅ Pre-Deployment Setup (COMPLETED)
 - [x] **Railway Configuration Created** - `backend/railway.json`
-- [x] **Railway Configuration Updated** - Switched from `nixpacks.toml` to `railway.toml` for better Railway compatibility
+- [x] **Railway Configuration Updated** - Using both `nixpacks.toml` (build config) and `railway.toml` (deployment config) for Railway compatibility
 - [x] **Vercel Configuration Created** - `documind-frontend/vercel.json`
 - [x] **Production Environment File Created** - `documind-frontend/.env.production`
 - [x] **CORS Configuration Updated** - Production-ready CORS in `backend/app/main.py`
