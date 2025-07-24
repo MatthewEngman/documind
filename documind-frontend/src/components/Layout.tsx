@@ -23,12 +23,17 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
           <div className="flex items-center justify-between">
             {/* Logo Section */}
             <div className="flex items-center space-x-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r from-red-500 to-red-600 shadow-lg">
                 <Database className="h-7 w-7 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">DocuMind</h1>
-                <p className="text-sm text-gray-600">Redis AI Challenge 2025</p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-gray-600">Redis AI Challenge 2025</p>
+                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full font-medium">
+                    Vector Sets Powered
+                  </span>
+                </div>
               </div>
             </div>
 
