@@ -5,6 +5,7 @@ import logging
 
 from app.config import settings
 from app.database.redis_client import redis_client
+from app.api import documents
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -77,6 +78,38 @@ async def get_redis_stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Include routers
+app.include_router(documents.router)
+
+# System statistics endpoint
+@app.get("/api/system/stats")
+async def get_system_stats():
+    """Get system statistics"""
+    try:
+        redis_stats = redis_client.get_stats()
+        
+        # Get document statistics
+        total_docs = redis_client.client.scard("doc:index") or 0
+        processed_docs = redis_client.client.get("stats:documents_processed") or 0
+        chunks_created = redis_client.client.get("stats:chunks_created") or 0
+        
+        return {
+            "system": {
+                "status": "healthy",
+                "redis_connected": redis_client.health_check()
+            },
+            "redis": redis_stats,
+            "documents": {
+                "total_documents": int(total_docs),
+                "processed_documents": int(processed_docs),
+                "total_chunks": int(chunks_created)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"System stats error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Test endpoint
 @app.get("/api/test")

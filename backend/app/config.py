@@ -21,9 +21,14 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 1536
     
     # File Upload Configuration
-    max_file_size: int = 10 * 1024 * 1024  # 10MB
-    allowed_extensions: set = {".pdf", ".txt", ".docx"}
+    max_file_size: int = 50 * 1024 * 1024  # 50MB (increased for larger documents)
+    allowed_extensions: set = {".pdf", ".txt", ".docx", ".doc", ".md", ".rtf"}
     upload_dir: str = "uploads"
+    
+    # Text Processing Configuration
+    max_chunk_size: int = 1000  # Maximum characters per chunk
+    min_chunk_size: int = 100   # Minimum characters per chunk
+    chunk_overlap: int = 50     # Overlap between chunks
     
     # Cache Configuration
     cache_ttl: int = 3600  # 1 hour

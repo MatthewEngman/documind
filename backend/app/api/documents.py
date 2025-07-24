@@ -1,217 +1,182 @@
-"""
-Document management API endpoints
-"""
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import JSONResponse
 from typing import List, Optional
 import logging
-import hashlib
-import uuid
-from datetime import datetime
 
-from app.database.models import (
-    DocumentMetadata, DocumentContent, UploadResponse, 
-    DocumentStatus, DocumentType, ErrorResponse
-)
+from app.services.document_processor import document_processor
 from app.database.redis_client import redis_client
-from app.services.document_processor import DocumentProcessor
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-# Initialize document processor
-doc_processor = DocumentProcessor()
-
-@router.post("/upload", response_model=UploadResponse)
-async def upload_document(file: UploadFile = File(...)):
-    """
-    Upload and process a document
-    """
+@router.post("/upload")
+async def upload_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
+):
+    """Upload and process a document"""
     try:
-        # Validate file type
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="No filename provided")
-        
-        file_extension = file.filename.split('.')[-1].lower()
-        if file_extension not in ['pdf', 'docx', 'txt']:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Unsupported file type: {file_extension}"
-            )
-        
         # Read file content
-        content = await file.read()
+        file_content = await file.read()
         
-        # Validate file size
-        if len(content) > settings.max_file_size:
-            raise HTTPException(
-                status_code=413, 
-                detail=f"File too large. Max size: {settings.max_file_size} bytes"
-            )
+        if not file_content:
+            raise HTTPException(status_code=400, detail="Empty file")
         
-        # Generate document ID and hash
-        document_id = str(uuid.uuid4())
-        content_hash = hashlib.sha256(content).hexdigest()
-        
-        # Create document metadata
-        metadata = DocumentMetadata(
-            id=document_id,
-            filename=file.filename,
-            file_type=DocumentType(file_extension),
-            file_size=len(content),
-            content_hash=content_hash,
-            processing_status=DocumentStatus.PENDING
+        # Process document
+        result = await document_processor.process_document(
+            file_content, 
+            file.filename
         )
         
-        # Store metadata in Redis
-        redis_client.set_json(
-            f"doc:meta:{document_id}", 
-            metadata.dict(),
-            ttl=None  # Persistent storage
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": "Document uploaded and processed successfully",
+                "doc_id": result["doc_id"],
+                "chunks_created": result["chunks_created"],
+                "processing_time": result["processing_time"],
+                "document": {
+                    "id": result["document"]["id"],
+                    "title": result["document"]["title"],
+                    "filename": result["document"]["filename"],
+                    "size_bytes": result["document"]["size_bytes"],
+                    "word_count": result["document"]["word_count"],
+                    "chunk_count": result["document"]["chunk_count"]
+                }
+            }
         )
         
-        # Process document asynchronously (in a real implementation, use background tasks)
-        try:
-            # Extract text content
-            text_content = await doc_processor.extract_text(content, file_extension)
-            
-            # Create document content
-            doc_content = DocumentContent(
-                document_id=document_id,
-                raw_text=text_content,
-                processed_timestamp=datetime.utcnow()
-            )
-            
-            # Store content in Redis
-            redis_client.set_json(
-                f"doc:content:{document_id}",
-                doc_content.dict()
-            )
-            
-            # Update status to completed
-            metadata.processing_status = DocumentStatus.COMPLETED
-            metadata.word_count = len(text_content.split())
-            
-            redis_client.set_json(
-                f"doc:meta:{document_id}",
-                metadata.dict()
-            )
-            
-            # Increment document counter
-            redis_client.increment_counter("stats:total_documents")
-            
-            logger.info(f"Document {document_id} processed successfully")
-            
-        except Exception as e:
-            # Update status to failed
-            metadata.processing_status = DocumentStatus.FAILED
-            redis_client.set_json(
-                f"doc:meta:{document_id}",
-                metadata.dict()
-            )
-            logger.error(f"Document processing failed: {e}")
-        
-        return UploadResponse(
-            document_id=document_id,
-            filename=file.filename,
-            file_size=len(content),
-            status=metadata.processing_status,
-            message="Document uploaded and processing initiated"
-        )
-        
-    except HTTPException:
-        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Upload failed: {e}")
+        logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/{document_id}", response_model=DocumentMetadata)
-async def get_document(document_id: str):
-    """
-    Get document metadata by ID
-    """
+@router.get("/")
+async def list_documents(
+    limit: int = 20,
+    offset: int = 0
+):
+    """List all documents"""
     try:
-        metadata = redis_client.get_json(f"doc:meta:{document_id}")
-        if not metadata:
+        documents = await document_processor.list_documents(limit, offset)
+        
+        return {
+            "documents": documents,
+            "total": len(documents),
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except Exception as e:
+        logger.error(f"List documents error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/{doc_id}")
+async def get_document(doc_id: str):
+    """Get document by ID"""
+    try:
+        document = await document_processor.get_document(doc_id)
+        
+        if not document:
             raise HTTPException(status_code=404, detail="Document not found")
         
-        return DocumentMetadata(**metadata)
+        # Get chunks information
+        chunks_key = f"doc:chunks:{doc_id}"
+        chunks_data = redis_client.get_json(chunks_key)
+        chunks_count = len(chunks_data.get("chunks", [])) if chunks_data else 0
+        
+        document["chunks_available"] = chunks_count
+        
+        return document
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get document {document_id}: {e}")
+        logger.error(f"Get document error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/{document_id}/content")
-async def get_document_content(document_id: str):
-    """
-    Get document content by ID
-    """
+@router.delete("/{doc_id}")
+async def delete_document(doc_id: str):
+    """Delete document"""
     try:
-        content = redis_client.get_json(f"doc:content:{document_id}")
-        if not content:
-            raise HTTPException(status_code=404, detail="Document content not found")
+        success = await document_processor.delete_document(doc_id)
         
-        return content
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get document content {document_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@router.delete("/{document_id}")
-async def delete_document(document_id: str):
-    """
-    Delete a document and its content
-    """
-    try:
-        # Check if document exists
-        metadata = redis_client.get_json(f"doc:meta:{document_id}")
-        if not metadata:
+        if not success:
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        # Delete metadata and content
-        redis_client.client.delete(f"doc:meta:{document_id}")
-        redis_client.client.delete(f"doc:content:{document_id}")
-        
-        # Decrement document counter
-        redis_client.client.decr("stats:total_documents")
-        
-        logger.info(f"Document {document_id} deleted successfully")
         
         return {"message": "Document deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete document {document_id}: {e}")
+        logger.error(f"Delete document error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/", response_model=List[DocumentMetadata])
-async def list_documents(
+@router.get("/{doc_id}/chunks")
+async def get_document_chunks(
+    doc_id: str,
     limit: int = 10,
-    offset: int = 0,
-    status: Optional[DocumentStatus] = None
+    offset: int = 0
 ):
-    """
-    List documents with pagination and filtering
-    """
+    """Get document chunks"""
     try:
-        # Get all document metadata keys
-        keys = redis_client.client.keys("doc:meta:*")
+        # Verify document exists
+        document = await document_processor.get_document(doc_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
         
-        documents = []
-        for key in keys[offset:offset + limit]:
-            metadata = redis_client.get_json(key)
-            if metadata:
-                doc_meta = DocumentMetadata(**metadata)
-                if status is None or doc_meta.processing_status == status:
-                    documents.append(doc_meta)
+        # Get chunks
+        chunks_key = f"doc:chunks:{doc_id}"
+        chunks_data = redis_client.get_json(chunks_key)
         
-        return documents
+        if not chunks_data or "chunks" not in chunks_data:
+            return {"chunks": [], "total": 0}
         
+        chunk_ids = chunks_data["chunks"][offset:offset + limit]
+        chunks = []
+        
+        for chunk_id in chunk_ids:
+            chunk_key = f"doc:chunk:{chunk_id}"
+            chunk_data = redis_client.get_json(chunk_key)
+            if chunk_data:
+                chunks.append(chunk_data)
+        
+        return {
+            "chunks": chunks,
+            "total": len(chunks_data["chunks"]),
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Failed to list documents: {e}")
+        logger.error(f"Get chunks error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/{doc_id}/status")
+async def get_processing_status(doc_id: str):
+    """Get document processing status"""
+    try:
+        status = document_processor.get_processing_status(doc_id)
+        
+        if not status:
+            # Check if document exists (completed processing)
+            document = await document_processor.get_document(doc_id)
+            if document:
+                return {
+                    "status": "completed",
+                    "progress": 100,
+                    "message": "Document processing completed"
+                }
+            else:
+                raise HTTPException(status_code=404, detail="Processing status not found")
+        
+        return status
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get status error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

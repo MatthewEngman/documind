@@ -1,234 +1,333 @@
-"""
-Document processing service
-"""
+import uuid
 import logging
-from typing import List, Dict, Any
-import PyPDF2
-import docx
-import io
+from typing import Dict, List, Optional
 from datetime import datetime
+import asyncio
+
+from app.database.redis_client import redis_client
+from app.services.file_handler import file_handler
+from app.services.text_extractor import text_extractor
+from app.services.text_chunker import text_chunker
+from app.services.embedding_service import embedding_service
 
 logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
-    """Service for processing different document types"""
+    """Main document processing pipeline orchestrator"""
     
     def __init__(self):
-        self.supported_types = ['pdf', 'docx', 'txt']
+        self.processing_status = {}
     
-    async def extract_text(self, content: bytes, file_type: str) -> str:
-        """
-        Extract text content from document based on file type
-        """
-        try:
-            if file_type == 'pdf':
-                return await self._extract_pdf_text(content)
-            elif file_type == 'docx':
-                return await self._extract_docx_text(content)
-            elif file_type == 'txt':
-                return await self._extract_txt_text(content)
-            else:
-                raise ValueError(f"Unsupported file type: {file_type}")
-                
-        except Exception as e:
-            logger.error(f"Text extraction failed for {file_type}: {e}")
-            raise
-    
-    async def _extract_pdf_text(self, content: bytes) -> str:
-        """Extract text from PDF file"""
-        try:
-            pdf_file = io.BytesIO(content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
-            
-            text_content = []
-            for page_num, page in enumerate(pdf_reader.pages):
-                try:
-                    page_text = page.extract_text()
-                    if page_text.strip():
-                        text_content.append(f"[Page {page_num + 1}]\n{page_text}")
-                except Exception as e:
-                    logger.warning(f"Failed to extract text from page {page_num + 1}: {e}")
-                    continue
-            
-            if not text_content:
-                raise ValueError("No text content found in PDF")
-            
-            return "\n\n".join(text_content)
-            
-        except Exception as e:
-            logger.error(f"PDF text extraction failed: {e}")
-            raise ValueError(f"Failed to extract text from PDF: {e}")
-    
-    async def _extract_docx_text(self, content: bytes) -> str:
-        """Extract text from DOCX file"""
-        try:
-            docx_file = io.BytesIO(content)
-            doc = docx.Document(docx_file)
-            
-            text_content = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text.strip():
-                    text_content.append(paragraph.text)
-            
-            # Extract text from tables
-            for table in doc.tables:
-                for row in table.rows:
-                    row_text = []
-                    for cell in row.cells:
-                        if cell.text.strip():
-                            row_text.append(cell.text.strip())
-                    if row_text:
-                        text_content.append(" | ".join(row_text))
-            
-            if not text_content:
-                raise ValueError("No text content found in DOCX")
-            
-            return "\n".join(text_content)
-            
-        except Exception as e:
-            logger.error(f"DOCX text extraction failed: {e}")
-            raise ValueError(f"Failed to extract text from DOCX: {e}")
-    
-    async def _extract_txt_text(self, content: bytes) -> str:
-        """Extract text from TXT file"""
-        try:
-            # Try different encodings
-            encodings = ['utf-8', 'utf-16', 'latin-1', 'cp1252']
-            
-            for encoding in encodings:
-                try:
-                    text = content.decode(encoding)
-                    if text.strip():
-                        return text
-                except UnicodeDecodeError:
-                    continue
-            
-            raise ValueError("Could not decode text file with any supported encoding")
-            
-        except Exception as e:
-            logger.error(f"TXT text extraction failed: {e}")
-            raise ValueError(f"Failed to extract text from TXT: {e}")
-    
-    def chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
-        """
-        Split text into overlapping chunks for processing
-        """
-        try:
-            if not text or not text.strip():
-                return []
-            
-            # Split by sentences first (simple approach)
-            sentences = text.replace('\n', ' ').split('. ')
-            
-            chunks = []
-            current_chunk = ""
-            
-            for sentence in sentences:
-                # Add sentence to current chunk
-                test_chunk = current_chunk + sentence + ". "
-                
-                if len(test_chunk) <= chunk_size:
-                    current_chunk = test_chunk
-                else:
-                    # Current chunk is full, save it and start new one
-                    if current_chunk.strip():
-                        chunks.append(current_chunk.strip())
-                    
-                    # Start new chunk with overlap
-                    if overlap > 0 and chunks:
-                        # Take last part of previous chunk for overlap
-                        overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
-                        current_chunk = overlap_text + sentence + ". "
-                    else:
-                        current_chunk = sentence + ". "
-            
-            # Add the last chunk
-            if current_chunk.strip():
-                chunks.append(current_chunk.strip())
-            
-            return chunks
-            
-        except Exception as e:
-            logger.error(f"Text chunking failed: {e}")
-            return [text]  # Return original text as single chunk if chunking fails
-    
-    def extract_metadata(self, text: str, filename: str) -> Dict[str, Any]:
-        """
-        Extract additional metadata from document content
-        """
-        try:
-            metadata = {
-                "word_count": len(text.split()),
-                "character_count": len(text),
-                "line_count": len(text.split('\n')),
-                "estimated_reading_time": max(1, len(text.split()) // 200),  # ~200 WPM
-                "language": self._detect_language(text),
-                "has_tables": "| " in text,  # Simple table detection
-                "has_numbers": any(char.isdigit() for char in text),
-                "processed_at": datetime.utcnow().isoformat()
-            }
-            
-            return metadata
-            
-        except Exception as e:
-            logger.error(f"Metadata extraction failed: {e}")
-            return {}
-    
-    def _detect_language(self, text: str) -> str:
-        """
-        Simple language detection (placeholder implementation)
-        In production, use a proper language detection library
-        """
-        try:
-            # Very basic language detection based on common words
-            english_words = ['the', 'and', 'is', 'in', 'to', 'of', 'a', 'that', 'it', 'with']
-            text_lower = text.lower()
-            
-            english_count = sum(1 for word in english_words if word in text_lower)
-            
-            if english_count >= 3:
-                return "en"
-            else:
-                return "unknown"
-                
-        except Exception:
-            return "unknown"
-    
-    def validate_document(self, content: bytes, filename: str) -> Dict[str, Any]:
-        """
-        Validate document before processing
-        """
-        validation_result = {
-            "valid": True,
-            "errors": [],
-            "warnings": []
-        }
+    async def process_document(self, file_content: bytes, filename: str) -> Dict:
+        """Process uploaded document through the complete pipeline"""
+        doc_id = str(uuid.uuid4())
+        start_time = datetime.utcnow()
         
         try:
-            # Check file size
-            if len(content) == 0:
-                validation_result["valid"] = False
-                validation_result["errors"].append("File is empty")
+            # Step 1: Validate file
+            self._update_status(doc_id, "validating", 5)
+            validation_result = await file_handler.validate_file(file_content, filename)
             
-            # Check filename
-            if not filename or '.' not in filename:
-                validation_result["valid"] = False
-                validation_result["errors"].append("Invalid filename")
+            if not validation_result["valid"]:
+                raise ValueError(validation_result["error"])
             
-            # Check file extension
-            file_extension = filename.split('.')[-1].lower()
-            if file_extension not in self.supported_types:
-                validation_result["valid"] = False
-                validation_result["errors"].append(f"Unsupported file type: {file_extension}")
+            # Step 2: Save file
+            self._update_status(doc_id, "saving", 10)
+            file_metadata = await file_handler.save_file(file_content, filename)
             
-            # Add warnings for large files
-            if len(content) > 5 * 1024 * 1024:  # 5MB
-                validation_result["warnings"].append("Large file may take longer to process")
+            # Step 3: Extract text
+            self._update_status(doc_id, "extracting", 25)
+            extraction_result = await text_extractor.extract_text(
+                file_content, filename, validation_result["mime_type"]
+            )
             
-            return validation_result
+            if not extraction_result["success"]:
+                raise ValueError(f"Text extraction failed: {extraction_result['error']}")
+            
+            # Step 4: Generate chunks
+            self._update_status(doc_id, "chunking", 50)
+            chunks = await text_chunker.chunk_text(
+                extraction_result["text"], 
+                doc_id, 
+                {"filename": filename}
+            )
+            
+            if not chunks:
+                raise ValueError("No valid chunks created from document")
+            
+            # Step 5: Store document metadata
+            self._update_status(doc_id, "storing", 75)
+            document = {
+                "id": doc_id,
+                "title": self._generate_title(filename, extraction_result["text"]),
+                "filename": filename,
+                "original_filename": filename,
+                "file_path": file_metadata["file_path"],
+                "file_hash": file_metadata["file_hash"],
+                "mime_type": validation_result["mime_type"],
+                "size_bytes": validation_result["size_bytes"],
+                "word_count": extraction_result.get("word_count", 0),
+                "char_count": extraction_result.get("char_count", 0),
+                "page_count": extraction_result.get("page_count", 0),
+                "chunk_count": len(chunks),
+                "extractor_used": extraction_result.get("extractor", "unknown"),
+                "tags": self._generate_tags(extraction_result, validation_result),
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "status": "processed"
+            }
+            
+            # Store document in Redis
+            redis_client.set_json(f"doc:{doc_id}", document)
+            
+            # Store chunks and create chunk index
+            chunk_ids = []
+            for chunk in chunks:
+                redis_client.set_json(f"doc:chunk:{chunk['id']}", chunk)
+                chunk_ids.append(chunk['id'])
+            
+            # Store chunk index for this document
+            redis_client.set_json(f"doc:chunks:{doc_id}", {
+                "doc_id": doc_id,
+                "chunks": chunk_ids,
+                "total_chunks": len(chunks),
+                "created_at": datetime.utcnow().isoformat()
+            })
+            
+            # Add to document index
+            redis_client.client.sadd("doc:index", doc_id)
+            
+            # Update statistics
+            redis_client.client.incr("stats:documents_processed")
+            redis_client.client.incrby("stats:chunks_created", len(chunks))
+            
+            # Step 6: Complete processing
+            self._update_status(doc_id, "completed", 100)
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            
+            # Clean up status after delay
+            self._cleanup_status(doc_id)
+            
+            logger.info(f"Document {doc_id} processed successfully: {len(chunks)} chunks in {processing_time:.2f}s")
+            
+            return {
+                "doc_id": doc_id,
+                "chunks_created": len(chunks),
+                "processing_time": processing_time,
+                "status": "success",
+                "document": {
+                    "id": document["id"],
+                    "title": document["title"],
+                    "filename": document["filename"],
+                    "size_bytes": document["size_bytes"],
+                    "word_count": document["word_count"],
+                    "chunk_count": document["chunk_count"]
+                }
+            }
             
         except Exception as e:
-            logger.error(f"Document validation failed: {e}")
-            validation_result["valid"] = False
-            validation_result["errors"].append("Validation failed")
-            return validation_result
+            self._update_status(doc_id, "failed", 0, str(e))
+            logger.error(f"Document processing failed for {filename}: {e}")
+            
+            # Clean up any partial data
+            await self._cleanup_failed_processing(doc_id)
+            raise
+    
+    def _generate_title(self, filename: str, text: str) -> str:
+        """Generate a meaningful title for the document"""
+        # Use filename without extension as base
+        base_title = filename.rsplit('.', 1)[0]
+        
+        # Try to find a better title from the text content
+        lines = text.split('\n')[:10]  # Check first 10 lines
+        for line in lines:
+            line = line.strip()
+            if line and len(line) > 10 and len(line) < 100:
+                # This might be a title
+                if not line.lower().startswith(('the ', 'a ', 'an ')):
+                    return line[:80]  # Limit title length
+        
+        return base_title
+    
+    def _generate_tags(self, extraction_result: Dict, validation_result: Dict) -> List[str]:
+        """Generate tags for the document based on content and metadata"""
+        tags = []
+        
+        # File type tags
+        file_ext = validation_result.get("extension", "").lower()
+        if file_ext:
+            tags.append(f"type{file_ext}")
+        
+        # Size-based tags
+        size_mb = validation_result.get("size_bytes", 0) / (1024 * 1024)
+        if size_mb > 10:
+            tags.append("large")
+        elif size_mb < 1:
+            tags.append("small")
+        else:
+            tags.append("medium")
+        
+        # Content tags (basic keyword detection)
+        text = extraction_result.get("text", "").lower()
+        keywords_map = {
+            "api": ["api", "endpoint", "rest", "graphql", "webhook"],
+            "security": ["security", "authentication", "authorization", "encryption", "ssl", "tls"],
+            "documentation": ["documentation", "guide", "manual", "readme", "instructions"],
+            "technical": ["technical", "engineering", "development", "code", "programming"],
+            "business": ["business", "strategy", "market", "revenue", "customer"],
+            "report": ["report", "analysis", "summary", "findings", "conclusion"],
+            "policy": ["policy", "procedure", "guidelines", "compliance", "standards"],
+            "contract": ["contract", "agreement", "terms", "conditions", "legal"]
+        }
+        
+        for tag, keywords in keywords_map.items():
+            if any(keyword in text for keyword in keywords):
+                tags.append(tag)
+        
+        # Page/length tags
+        if "page_count" in extraction_result:
+            page_count = extraction_result["page_count"]
+            if page_count > 50:
+                tags.append("lengthy")
+            elif page_count < 5:
+                tags.append("brief")
+        
+        # Word count tags
+        word_count = extraction_result.get("word_count", 0)
+        if word_count > 5000:
+            tags.append("detailed")
+        elif word_count < 500:
+            tags.append("concise")
+        
+        # Date-based tags (current month/year)
+        current_date = datetime.utcnow()
+        tags.append(f"uploaded_{current_date.strftime('%Y_%m')}")
+        
+        # Remove duplicates and return
+        return list(set(tags))
+    
+    def _update_status(self, doc_id: str, status: str, progress: int, error: str = None):
+        """Update processing status"""
+        self.processing_status[doc_id] = {
+            "status": status,
+            "progress": progress,
+            "timestamp": datetime.utcnow().isoformat(),
+            "error": error
+        }
+    
+    def _get_processing_time(self, doc_id: str) -> float:
+        """Calculate processing time"""
+        if doc_id not in self.processing_status:
+            return 0
+        
+        start_time = datetime.fromisoformat(self.processing_status[doc_id]["timestamp"])
+        end_time = datetime.utcnow()
+        return (end_time - start_time).total_seconds()
+    
+    def _cleanup_status(self, doc_id: str, delay_seconds: int = 300):
+        """Clean up processing status after delay"""
+        import threading
+        
+        def cleanup():
+            import time
+            time.sleep(delay_seconds)
+            self.processing_status.pop(doc_id, None)
+        
+        thread = threading.Thread(target=cleanup)
+        thread.daemon = True
+        thread.start()
+    
+    async def _cleanup_failed_processing(self, doc_id: str):
+        """Clean up any data from failed processing"""
+        try:
+            # Remove document if it exists
+            redis_client.client.delete(f"doc:{doc_id}")
+            
+            # Remove from index
+            redis_client.client.srem("doc:index", doc_id)
+            
+            # Remove chunks index
+            redis_client.client.delete(f"doc:chunks:{doc_id}")
+            
+            # Note: Individual chunks would need to be tracked and cleaned up
+            # This is a simplified cleanup
+            
+        except Exception as e:
+            logger.error(f"Cleanup failed for {doc_id}: {e}")
+    
+    def get_processing_status(self, doc_id: str) -> Optional[Dict]:
+        """Get processing status for a document"""
+        return self.processing_status.get(doc_id)
+    
+    async def get_document(self, doc_id: str) -> Optional[Dict]:
+        """Get document by ID"""
+        return redis_client.get_json(f"doc:{doc_id}")
+    
+    async def list_documents(self, limit: int = 20, offset: int = 0) -> List[Dict]:
+        """List all documents with pagination"""
+        try:
+            doc_ids = list(redis_client.client.smembers("doc:index"))
+            doc_ids = [doc_id.decode() if isinstance(doc_id, bytes) else doc_id for doc_id in doc_ids]
+            
+            # Sort by creation date (newest first)
+            documents_with_dates = []
+            for doc_id in doc_ids:
+                doc = redis_client.get_json(f"doc:{doc_id}")
+                if doc:
+                    documents_with_dates.append((doc, doc.get("created_at", "")))
+            
+            # Sort by date descending
+            documents_with_dates.sort(key=lambda x: x[1], reverse=True)
+            
+            # Apply pagination
+            paginated_docs = documents_with_dates[offset:offset + limit]
+            
+            return [doc[0] for doc in paginated_docs]
+            
+        except Exception as e:
+            logger.error(f"List documents error: {e}")
+            return []
+    
+    async def delete_document(self, doc_id: str) -> bool:
+        """Delete document and all associated data"""
+        try:
+            # Get document to check if it exists
+            doc = redis_client.get_json(f"doc:{doc_id}")
+            if not doc:
+                return False
+            
+            # Get chunks to delete
+            chunks_data = redis_client.get_json(f"doc:chunks:{doc_id}")
+            if chunks_data and "chunks" in chunks_data:
+                # Delete individual chunks
+                for chunk_id in chunks_data["chunks"]:
+                    redis_client.client.delete(f"doc:chunk:{chunk_id}")
+            
+            # Delete chunks index
+            redis_client.client.delete(f"doc:chunks:{doc_id}")
+            
+            # Delete document
+            redis_client.client.delete(f"doc:{doc_id}")
+            
+            # Remove from index
+            redis_client.client.srem("doc:index", doc_id)
+            
+            # Delete file if it exists
+            if "file_path" in doc:
+                await file_handler.delete_file(doc["file_path"])
+            
+            # Update statistics
+            redis_client.client.decr("stats:documents_processed")
+            if chunks_data:
+                chunk_count = len(chunks_data.get("chunks", []))
+                redis_client.client.decrby("stats:chunks_created", chunk_count)
+            
+            logger.info(f"Document {doc_id} deleted successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Document deletion failed for {doc_id}: {e}")
+            return False
+
+# Global instance
+document_processor = DocumentProcessor()

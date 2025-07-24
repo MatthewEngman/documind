@@ -252,3 +252,6 @@ class EmbeddingService:
         except Exception as e:
             logger.error(f"Document chunk embedding failed: {e}")
             return []
+
+# Global instance
+embedding_service = EmbeddingService()
