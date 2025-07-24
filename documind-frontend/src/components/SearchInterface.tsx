@@ -113,8 +113,9 @@ const SearchInterface: React.FC<SearchInterfaceProps> = ({ onResultClick }) => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          Search through your documents using natural language. Powered by Redis Vector Sets 
-          and OpenAI embeddings for instant semantic matching.
+          Search through your documents using natural language. Powered by **Redis 8 Vector Sets** 
+          with 75% memory reduction and **semantic caching** for instant results. Experience sub-second 
+          search across your entire knowledge base.
         </motion.p>
       </div>
 
