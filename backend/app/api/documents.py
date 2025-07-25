@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 import logging
+import uuid
 
 from app.services.document_processor import document_processor
 from app.database.redis_client import redis_client
@@ -14,7 +15,7 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...)
 ):
-    """Upload and process a document"""
+    """Upload and process a document asynchronously"""
     try:
         # Read file content
         file_content = await file.read()
@@ -22,32 +23,27 @@ async def upload_document(
         if not file_content:
             raise HTTPException(status_code=400, detail="Empty file")
         
-        # Process document
-        result = await document_processor.process_document(
-            file_content, 
+        doc_id = str(uuid.uuid4())
+        
+        document_processor._update_status(doc_id, "queued", 0)
+        
+        background_tasks.add_task(
+            _process_document_background,
+            doc_id,
+            file_content,
             file.filename
         )
         
         return JSONResponse(
-            status_code=201,
+            status_code=202,
             content={
-                "message": "Document uploaded and processed successfully",
-                "doc_id": result["doc_id"],
-                "chunks_created": result["chunks_created"],
-                "processing_time": result["processing_time"],
-                "document": {
-                    "id": result["document"]["id"],
-                    "title": result["document"]["title"],
-                    "filename": result["document"]["filename"],
-                    "size_bytes": result["document"]["size_bytes"],
-                    "word_count": result["document"]["word_count"],
-                    "chunk_count": result["document"]["chunk_count"]
-                }
+                "message": "Document queued for processing",
+                "doc_id": doc_id,
+                "status": "queued",
+                "status_url": f"/api/documents/{doc_id}/status"
             }
         )
         
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Upload error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -113,6 +109,21 @@ async def delete_document(doc_id: str):
         logger.error(f"Delete document error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+async def _process_document_background(doc_id: str, file_content: bytes, filename: str):
+    """Background task for document processing"""
+    try:
+        # Process document using existing pipeline
+        result = await document_processor.process_document(
+            file_content, 
+            filename,
+            doc_id
+        )
+        logger.info(f"Background processing completed for document {doc_id}")
+        
+    except Exception as e:
+        logger.error(f"Background processing failed for {doc_id}: {e}")
+        document_processor._update_status(doc_id, "failed", 0, str(e))
+
 @router.get("/{doc_id}/chunks")
 async def get_document_chunks(
     doc_id: str,
@@ -168,12 +179,23 @@ async def get_processing_status(doc_id: str):
                 return {
                     "status": "completed",
                     "progress": 100,
-                    "message": "Document processing completed"
+                    "message": "Document processing completed",
+                    "document": {
+                        "id": document["id"],
+                        "title": document["title"],
+                        "filename": document["filename"],
+                        "chunk_count": document["chunk_count"]
+                    }
                 }
             else:
-                raise HTTPException(status_code=404, detail="Processing status not found")
+                raise HTTPException(status_code=404, detail="Document not found")
         
-        return status
+        return {
+            "status": status["status"],
+            "progress": status["progress"],
+            "message": status.get("error") or f"Processing: {status['status']}",
+            "timestamp": status["timestamp"]
+        }
         
     except HTTPException:
         raise

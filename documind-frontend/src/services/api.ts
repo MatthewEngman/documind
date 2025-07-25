@@ -3,11 +3,11 @@ import axios from 'axios';
 // Update the API_BASE configuration for production
 const API_BASE = process.env.NODE_ENV === 'production' 
   ? process.env.REACT_APP_API_URL || 'https://documind-backend-700575219498.us-central1.run.app'
-  : process.env.REACT_APP_API_URL || 'https://document-loader-app-tunnel-4m88whlo.devinapps.com';
+  : process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const apiClient = axios.create({
   baseURL: API_BASE,
-  timeout: 30000,
+  timeout: 120000,
 });
 
 // Request interceptor for logging
@@ -137,6 +137,11 @@ export const documentApi = {
 
   getChunks: async (docId: string, limit = 10, offset = 0) => {
     const response = await apiClient.get(`/api/documents/${docId}/chunks?limit=${limit}&offset=${offset}`);
+    return response.data;
+  },
+
+  getStatus: async (docId: string) => {
+    const response = await apiClient.get(`/api/documents/${docId}/status`);
     return response.data;
   },
 };
