@@ -1,0 +1,8 @@
+{
+  "name": "documind-redis-challenge",
+  "alias": ["documind-redis-challenge"],
+  "env": {
+    "REACT_APP_API_URL": "https://documind-backend-700575219498.us-central1.run.app",
+    "REACT_APP_VERSION": "1.0.0"
+  }
+}

@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Update the API_BASE configuration for production
+const API_BASE = process.env.NODE_ENV === 'production' 
+  ? process.env.REACT_APP_API_URL || 'https://documind-backend-700575219498.us-central1.run.app'
+  : process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const apiClient = axios.create({
   baseURL: API_BASE,
@@ -13,10 +16,18 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor for error handling
+// Add better error handling for production
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    // Add retry logic for production
+    if (error.response?.status >= 500 && !error.config._retry) {
+      error.config._retry = true;
+      console.log('🔄 Retrying request due to server error...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return apiClient.request(error.config);
+    }
+    
     console.error('❌ API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }

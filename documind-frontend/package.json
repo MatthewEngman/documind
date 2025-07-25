@@ -10,6 +10,7 @@
     "challenge-2025"
   ],
   "private": true,
+  "homepage": ".",
   "dependencies": {
     "@headlessui/react": "^2.2.5",
     "@radix-ui/react-dialog": "^1.1.14",
