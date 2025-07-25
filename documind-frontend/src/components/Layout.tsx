@@ -27,11 +27,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
                 <Database className="h-7 w-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">DocuMind</h1>
-                <div className="flex items-center space-x-2">
-                  <p className="text-sm text-gray-600">Redis AI Challenge 2025</p>
-                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full font-medium">
-                    Vector Sets Powered
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center space-x-2">
+                  <span>DocuMind</span>
+                  <span className="text-xs bg-gradient-to-r from-red-500 to-blue-500 text-white px-2 py-1 rounded-full">
+                    AI CHALLENGE 2025
+                  </span>
+                </h1>
+                <div className="flex items-center space-x-3">
+                  <p className="text-sm text-gray-600">Redis AI Challenge 2025 • Vector Sets Powered</p>
+                  <span className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full font-medium border border-red-200">
+                    🏆 Competition Entry
                   </span>
                 </div>
               </div>
