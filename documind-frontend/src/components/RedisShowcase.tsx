@@ -111,7 +111,7 @@ const RedisShowcase: React.FC = () => {
               console.log('Load Demo Data button clicked!');
               try {
                 console.log('Making fetch request to load demo data...');
-                const response = await fetch('https://user:384833be0b606818b7c811905163b384@document-loader-app-tunnel-4m88whlo.devinapps.com/api/load-demo', { 
+                const response = await fetch('https://document-loader-app-tunnel-4m88whlo.devinapps.com/api/load-demo', { 
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
