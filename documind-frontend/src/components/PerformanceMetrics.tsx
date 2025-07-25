@@ -30,7 +30,9 @@ export const PerformanceMetrics: React.FC = () => {
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const response = await fetch('http://localhost:8001/api/system/stats');
+        const response = await fetch('https://user:384833be0b606818b7c811905163b384@document-loader-app-tunnel-4m88whlo.devinapps.com/api/system/stats', {
+          mode: 'cors'
+        });
         if (response.ok) {
           const data = await response.json();
           setMetrics(prev => ({ 
