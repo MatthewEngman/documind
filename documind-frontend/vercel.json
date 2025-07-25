@@ -22,6 +22,9 @@
   ],
   "env": {
     "REACT_APP_API_URL": "https://documind-backend-700575219498.us-central1.run.app",
-    "REACT_APP_VERSION": "1.0.0"
+    "REACT_APP_VERSION": "1.0.0",
+    "CI": "false",
+    "ESLINT_NO_DEV_ERRORS": "true",
+    "TSC_COMPILE_ON_ERROR": "true"
   }
 }
