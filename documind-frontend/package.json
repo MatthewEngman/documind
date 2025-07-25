@@ -1,6 +1,6 @@
 {
   "name": "documind-redis-ai-challenge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Redis AI Challenge 2025 - Semantic Document Cache powered by Redis 8 Vector Sets",
   "keywords": [
     "redis",
