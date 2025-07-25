@@ -232,7 +232,7 @@ class DemoDataLoader:
             )
             
             # Store metadata
-            redis_client.set_json(f"doc:meta:{document_id}", metadata.dict())
+            redis_client.set_json(f"doc:meta:{document_id}", metadata.model_dump(mode='json'))
             
             # Create and store content
             doc_content = DocumentContent(
@@ -241,10 +241,11 @@ class DemoDataLoader:
                 processed_timestamp=datetime.utcnow()
             )
             
-            redis_client.set_json(f"doc:content:{document_id}", doc_content.dict())
+            redis_client.set_json(f"doc:content:{document_id}", doc_content.model_dump(mode='json'))
             
             # Chunk and index the document
-            chunks = self.doc_processor.chunk_text(doc_data["content"])
+            from app.services.text_chunker import text_chunker
+            chunks = await text_chunker.chunk_text(doc_data["content"], document_id, {"filename": doc_data["filename"]})
             await self.search_service.index_document_chunks(document_id, chunks)
             
             # Update counters
