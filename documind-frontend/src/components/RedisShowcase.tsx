@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Database, Zap, TrendingUp, Activity } from 'lucide-react';
 
-const RedisShowcase: React.FC = () => {
+export const RedisShowcase: React.FC = () => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -130,5 +130,3 @@ const RedisShowcase: React.FC = () => {
     </motion.div>
   );
 };
-
-export default RedisShowcase;
