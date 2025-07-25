@@ -60,6 +60,8 @@ allowed_origins = [
     "http://localhost:3001",  # Local development (alternative port)
     "http://127.0.0.1:3000",  # Local development
     "http://127.0.0.1:3001",  # Local development (alternative port)
+    "https://document-loader-app-tunnel-lfkzbuch.devinapps.com",  # Public frontend tunnel
+    "https://user:35acd6de5955ce776eaeb1e5eab7d418@document-loader-app-tunnel-lfkzbuch.devinapps.com",  # Public frontend tunnel with auth
 ]
 
 # Add environment-specific origins
