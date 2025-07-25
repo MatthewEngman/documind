@@ -57,7 +57,9 @@ app = FastAPI(
 allowed_origins = [
     "https://*.vercel.app",  # All Vercel deployments
     "http://localhost:3000",  # Local development
+    "http://localhost:3001",  # Local development (alternative port)
     "http://127.0.0.1:3000",  # Local development
+    "http://127.0.0.1:3001",  # Local development (alternative port)
 ]
 
 # Add environment-specific origins
@@ -106,6 +108,79 @@ async def get_redis_stats():
 app.include_router(documents.router)
 app.include_router(search.router)
 
+@app.post("/api/load-demo")
+async def load_demo_data():
+    """Load demo documents for showcase"""
+    try:
+        import sys
+        import os
+        import uuid
+        from datetime import datetime
+        
+        SAMPLE_DOCS = [
+            {
+                "filename": "machine_learning_intro.txt",
+                "content": "Machine Learning Introduction\n\nMachine learning is a subset of artificial intelligence (AI) that provides systems the ability to automatically learn and improve from experience without being explicitly programmed..."
+            },
+            {
+                "filename": "python_programming_guide.txt", 
+                "content": "Python Programming Guide\n\nPython is a high-level, interpreted programming language with dynamic semantics..."
+            },
+            {
+                "filename": "database_design_principles.txt",
+                "content": "Database Design Principles\n\nDatabase design is the process of producing a detailed data model of a database..."
+            },
+            {
+                "filename": "artificial_intelligence_overview.txt",
+                "content": "Artificial Intelligence Overview\n\nArtificial Intelligence (AI) refers to the simulation of human intelligence in machines..."
+            },
+            {
+                "filename": "data_science_methodology.txt",
+                "content": "Data Science Methodology\n\nData science is an interdisciplinary field that uses scientific methods, processes, algorithms..."
+            }
+        ]
+        
+        loaded_count = 0
+        
+        for doc_data in SAMPLE_DOCS:
+            doc_id = str(uuid.uuid4())
+            
+            doc_format = {
+                "id": doc_id,
+                "filename": doc_data["filename"],
+                "title": doc_data["filename"].replace('.txt', '').replace('_', ' ').title(),
+                "file_type": "txt",
+                "file_size": len(doc_data["content"].encode('utf-8')),
+                "word_count": len(doc_data["content"].split()),
+                "language": "en",
+                "created_at": datetime.utcnow().isoformat(),
+                "processing_status": "completed"
+            }
+            
+            redis_client.set_json(f"doc:{doc_id}", doc_format)
+            redis_client.set_json(f"doc:content:{doc_id}", {
+                "document_id": doc_id,
+                "raw_text": doc_data["content"],
+                "processed_timestamp": datetime.utcnow().isoformat()
+            })
+            
+            try:
+                redis_client.client.sadd("doc:index", doc_id)
+            except AttributeError:
+                if not hasattr(redis_client.client, '_sets'):
+                    redis_client.client._sets = {}
+                if "doc:index" not in redis_client.client._sets:
+                    redis_client.client._sets["doc:index"] = set()
+                redis_client.client._sets["doc:index"].add(doc_id)
+            
+            redis_client.increment_counter("stats:total_documents")
+            loaded_count += 1
+        
+        return {"message": f"Successfully loaded {loaded_count} demo documents", "count": loaded_count}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load demo data: {str(e)}")
+
 # System statistics endpoint
 @app.get("/api/system/stats")
 async def get_system_stats():
@@ -115,7 +190,12 @@ async def get_system_stats():
         
         # Get document statistics
         if redis_client.client:
-            total_docs = redis_client.client.scard("doc:index") or 0
+            total_docs_counter = redis_client.client.get("stats:total_documents")
+            if total_docs_counter:
+                total_docs = int(total_docs_counter)
+            else:
+                total_docs = redis_client.client.scard("doc:index") if hasattr(redis_client.client, 'scard') else 0
+            
             processed_docs = redis_client.client.get("stats:documents_processed") or 0
             chunks_created = redis_client.client.get("stats:chunks_created") or 0
         else:

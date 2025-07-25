@@ -7,6 +7,8 @@ import SearchInterface from './components/SearchInterface';
 import DocumentList from './components/DocumentList';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import RedisShowcase from './components/RedisShowcase';
+import { PerformanceMetrics } from './components/PerformanceMetrics';
+import { RedisChallenge } from './components/RedisChallenge';
 import CompetitionBanner from './components/CompetitionBanner';
 import { Document, SearchResult } from './services/api';
 
@@ -76,6 +78,8 @@ function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <CompetitionBanner />
             <RedisShowcase />
+            <PerformanceMetrics />
+            <RedisChallenge />
             {renderActiveTab()}
           </div>
         </Layout>
