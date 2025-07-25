@@ -24,28 +24,10 @@ export const PerformanceMetrics: React.FC = () => {
     searchSpeed: '< 100ms',
     cacheHitRate: '80%',
     memoryReduction: '75%',
-    totalDocuments: 0
+    totalDocuments: 'Upload docs to see count'
   });
 
   useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        const response = await fetch('http://localhost:8001/api/system/stats');
-        if (response.ok) {
-          const data = await response.json();
-          setMetrics(prev => ({ 
-            ...prev, 
-            totalDocuments: data.documents?.total_documents || 0 
-          }));
-        }
-      } catch (error) {
-        console.error('Failed to fetch metrics:', error);
-      }
-    };
-
-    fetchMetrics();
-    const interval = setInterval(fetchMetrics, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -79,7 +61,7 @@ export const PerformanceMetrics: React.FC = () => {
         />
         <MetricCard 
           label="Documents" 
-          value={metrics.totalDocuments.toString()} 
+          value={metrics.totalDocuments} 
           icon="📄" 
           color="from-blue-500 to-purple-600"
         />

@@ -3,7 +3,7 @@ import axios from 'axios';
 // Update the API_BASE configuration for production
 const API_BASE = process.env.NODE_ENV === 'production' 
   ? process.env.REACT_APP_API_URL || 'https://documind-backend-700575219498.us-central1.run.app'
-  : process.env.REACT_APP_API_URL || 'http://localhost:8001';
+  : process.env.REACT_APP_API_URL || 'https://document-loader-app-tunnel-4m88whlo.devinapps.com';
 
 const apiClient = axios.create({
   baseURL: API_BASE,

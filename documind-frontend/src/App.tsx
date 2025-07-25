@@ -6,7 +6,7 @@ import DocumentUpload from './components/DocumentUpload';
 import SearchInterface from './components/SearchInterface';
 import DocumentList from './components/DocumentList';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
-import RedisShowcase from './components/RedisShowcase';
+import { RedisShowcase } from './components/RedisShowcase';
 import { PerformanceMetrics } from './components/PerformanceMetrics';
 import { RedisChallenge } from './components/RedisChallenge';
 import CompetitionBanner from './components/CompetitionBanner';
