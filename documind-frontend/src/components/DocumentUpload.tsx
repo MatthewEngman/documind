@@ -46,20 +46,55 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
         // Upload file
         const result = await documentApi.upload(file);
         
-        // Update progress to success
-        setUploads(prev => prev.map((upload, idx) => 
-          idx === uploadIndex 
-            ? { 
-                ...upload, 
-                status: 'success', 
-                progress: 100,
-                docId: result.doc_id 
-              }
-            : upload
-        ));
-
-        toast.success(`${file.name} uploaded successfully!`);
-        onUploadSuccess();
+        const docId = result.doc_id;
+        let completed = false;
+        let attempts = 0;
+        const maxAttempts = 120;
+        
+        while (!completed && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          try {
+            const statusResult = await documentApi.getStatus(docId);
+            
+            // Update progress
+            setUploads(prev => prev.map((upload, idx) => 
+              idx === uploadIndex 
+                ? { 
+                    ...upload, 
+                    status: statusResult.status === 'completed' ? 'success' : 'processing',
+                    progress: statusResult.progress 
+                  }
+                : upload
+            ));
+            
+            if (statusResult.status === 'completed') {
+              completed = true;
+              // Update to success
+              setUploads(prev => prev.map((upload, idx) => 
+                idx === uploadIndex 
+                  ? { 
+                      ...upload, 
+                      status: 'success', 
+                      progress: 100,
+                      docId: docId 
+                    }
+                  : upload
+              ));
+              
+              toast.success(`${file.name} uploaded successfully!`);
+              onUploadSuccess();
+            } else if (statusResult.status === 'failed') {
+              throw new Error(statusResult.message || 'Processing failed');
+            }
+          } catch (statusError) {
+            if (attempts === maxAttempts - 1) {
+              throw new Error('Processing timeout - please try again');
+            }
+          }
+          
+          attempts++;
+        }
 
       } catch (error: any) {
         // Update progress to error

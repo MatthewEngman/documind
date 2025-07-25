@@ -19,9 +19,10 @@ class DocumentProcessor:
     def __init__(self):
         self.processing_status = {}
     
-    async def process_document(self, file_content: bytes, filename: str) -> Dict:
+    async def process_document(self, file_content: bytes, filename: str, doc_id: str = None) -> Dict:
         """Process uploaded document through the complete pipeline"""
-        doc_id = str(uuid.uuid4())
+        if doc_id is None:
+            doc_id = str(uuid.uuid4())
         start_time = datetime.utcnow()
         
         try:
