@@ -23,11 +23,16 @@ const RedisShowcase: React.FC = () => {
             VECTOR SETS POWERED
           </div>
         </motion.div>
-        <h3 className="text-3xl font-bold text-gray-900 mb-3">
-          🚀 Real-Time AI Innovation with Redis 8 Vector Sets
-        </h3>
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-xl">R</span>
+          </div>
+          <h3 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+            Powered by Redis 8
+          </h3>
+        </div>
         <p className="text-lg text-gray-700 max-w-3xl mx-auto">
-          Experience revolutionary <strong>75% memory reduction</strong> and <strong>sub-second semantic search</strong> 
+          Experience revolutionary <strong>75% memory reduction</strong> and <strong>sub-second semantic search </strong> 
           powered by Redis 8's quantized vector embeddings and intelligent semantic caching
         </p>
       </div>
@@ -88,6 +93,40 @@ const RedisShowcase: React.FC = () => {
         transition={{ delay: 0.7 }}
         className="mt-6 text-center"
       >
+        <div className="flex gap-4 justify-center mb-4">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              try {
+                const response = await fetch('http://localhost:8001/api/load-demo', { method: 'POST' });
+                if (response.ok) {
+                  alert('Demo data loaded successfully! 🎉');
+                  window.location.reload();
+                } else {
+                  alert('Demo data may already be loaded or there was an error.');
+                }
+              } catch (error) {
+                console.error('Failed to load demo data:', error);
+                alert('Failed to load demo data. Please try again.');
+              }
+            }}
+            className="bg-gradient-to-r from-red-600 to-red-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 z-10 relative"
+            type="button"
+          >
+            🚀 Load Demo Data
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 z-10 relative"
+            type="button"
+          >
+            Try Live Demo →
+          </motion.button>
+        </div>
         <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500 to-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium">
           <span>🎯 Real-Time AI Innovators Category</span>
         </div>

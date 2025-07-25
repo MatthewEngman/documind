@@ -9,9 +9,19 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 class RedisClient:
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
     def __init__(self):
-        self.client: Optional[redis.Redis] = None
-        self._connected = False
+        if not RedisClient._initialized:
+            self.client: Optional[redis.Redis] = None
+            self._connected = False
+            RedisClient._initialized = True
     
     def connect(self):
         """Establish Redis connection using IP to avoid IDNA issues"""
@@ -313,8 +323,9 @@ class MockRedisClient:
     
     def incr(self, key, amount=1):
         current = int(self._data.get(key, 0))
-        self._data[key] = str(current + amount)
-        return current + amount
+        new_value = current + amount
+        self._data[key] = str(new_value)
+        return new_value
     
     def dbsize(self):
         return len(self._data)
@@ -340,7 +351,40 @@ class EnhancedMockRedisClient(MockRedisClient):
     def __init__(self):
         super().__init__()
         self._vectors = {}
+        if not hasattr(self, '_sorted_sets'):
+            self._sorted_sets = {}
+        if not hasattr(self, '_lists'):
+            self._lists = {}
         logger.info("🔧 Using enhanced mock Redis for demo")
+    
+    def zadd(self, key, mapping):
+        """Add to sorted set"""
+        if key not in self._sorted_sets:
+            self._sorted_sets[key] = {}
+        self._sorted_sets[key].update(mapping)
+        return len(mapping)
+    
+    def zcard(self, key):
+        """Get sorted set cardinality"""
+        return len(self._sorted_sets.get(key, {}))
+    
+    def lpush(self, key, *values):
+        """Push to list"""
+        if key not in self._lists:
+            self._lists[key] = []
+        for value in reversed(values):
+            self._lists[key].insert(0, value)
+        return len(self._lists[key])
+    
+    def llen(self, key):
+        """Get list length"""
+        return len(self._lists.get(key, []))
+    
+    def ltrim(self, key, start, end):
+        """Trim list"""
+        if key in self._lists:
+            self._lists[key] = self._lists[key][start:end+1]
+        return True
     
     def ft(self, index_name):
         """Mock Redis Search"""
