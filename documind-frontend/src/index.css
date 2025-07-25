@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Modern DocuMind - Complete Fallback CSS Solution */
 
 /* Reset and Base Styles */

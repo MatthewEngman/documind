@@ -114,8 +114,9 @@ const SearchInterface: React.FC<SearchInterfaceProps> = ({ onResultClick }) => {
           transition={{ delay: 0.1 }}
         >
           Search through your documents using natural language. Powered by **Redis 8 Vector Sets** 
-          with 75% memory reduction and **semantic caching** for instant results. Experience sub-second 
-          search across your entire knowledge base.
+          with revolutionary 75% memory reduction and **semantic caching** for instant results. 
+          Experience sub-second search across your entire knowledge base with quantized embeddings 
+          and intelligent query optimization.
         </motion.p>
       </div>
 
