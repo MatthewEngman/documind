@@ -62,6 +62,7 @@ allowed_origins = [
     "http://127.0.0.1:3001",  # Local development (alternative port)
     "https://document-loader-app-tunnel-lfkzbuch.devinapps.com",  # Public frontend tunnel
     "https://user:35acd6de5955ce776eaeb1e5eab7d418@document-loader-app-tunnel-lfkzbuch.devinapps.com",  # Public frontend tunnel with auth
+    "*",  # Allow all origins for debugging
 ]
 
 # Add environment-specific origins
@@ -71,8 +72,8 @@ if frontend_url:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for debugging
+    allow_credentials=False,  # Disable credentials when allowing all origins
     allow_methods=["*"],
     allow_headers=["*"],
 )

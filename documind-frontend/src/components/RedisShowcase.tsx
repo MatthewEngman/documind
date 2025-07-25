@@ -101,58 +101,28 @@ const RedisShowcase: React.FC = () => {
         transition={{ delay: 0.7 }}
         className="mt-6 text-center"
       >
-        <div className="flex gap-4 justify-center mb-4">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={async (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('Load Demo Data button clicked!');
-              try {
-                console.log('Making fetch request to load demo data...');
-                const response = await fetch('https://document-loader-app-tunnel-4m88whlo.devinapps.com/api/load-demo', { 
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  mode: 'cors'
-                });
-                console.log('Response received:', response.status, response.ok);
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  console.log('Response data:', data);
-                  alert('✅ Demo data loaded successfully!\n\n' + data.message + '\n\nThe page will refresh to show updated metrics.');
-                  
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 1000);
-                } else {
-                  const errorText = await response.text();
-                  console.error('Error response:', errorText);
-                  alert('⚠️ Demo data may already be loaded.\n\nResponse: ' + errorText);
-                }
-              } catch (error) {
-                console.error('Failed to load demo data:', error);
-                alert('❌ Failed to load demo data.\n\nError: ' + (error instanceof Error ? error.message : String(error)) + '\n\nPlease check the console for details.');
-              }
-            }}
-            className="bg-gradient-to-r from-red-600 to-red-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 z-10 relative"
-            type="button"
-          >
-            🚀 Load Demo Data
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => window.open('https://documind-ruby.vercel.app/', '_blank')}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 z-10 relative"
-            type="button"
-          >
-            Try Live Demo →
-          </motion.button>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 max-w-2xl mx-auto"
+        >
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            📄 Ready to Test? Upload Your Documents!
+          </h3>
+          <p className="text-gray-600 mb-4">
+            Click the <strong>"Upload"</strong> button above to add your own documents and experience Redis-powered semantic search in action.
+          </p>
+          <div className="text-sm text-gray-500">
+            <p className="mb-2">💡 <strong>Suggested test documents:</strong></p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-left">
+              <p>• Research papers (PDF)</p>
+              <p>• Technical documentation (TXT, MD)</p>
+              <p>• Code files (PY, JS, etc.)</p>
+              <p>• Any text-based content for semantic search testing</p>
+            </div>
+          </div>
+        </motion.div>
         <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500 to-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium">
           <span>🎯 Real-Time AI Innovators Category</span>
         </div>
