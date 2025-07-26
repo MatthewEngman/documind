@@ -42,6 +42,7 @@ class RedisClient:
             self.client = redis.Redis(
                 host=redis_host,
                 port=redis_port,
+                username="default",
                 password=redis_password,
                 ssl=True,
                 ssl_cert_reqs=None,
