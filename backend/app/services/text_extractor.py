@@ -61,21 +61,33 @@ class TextExtractor:
     async def _extract_pdf(self, file_content: bytes, filename: str) -> Dict:
         """Extract text from PDF using pdfplumber (better than PyPDF2)"""
         try:
-            text_content = []
-            page_count = 0
+            import asyncio
             
-            with io.BytesIO(file_content) as pdf_buffer:
-                with pdfplumber.open(pdf_buffer) as pdf:
-                    page_count = len(pdf.pages)
-                    
-                    for page_num, page in enumerate(pdf.pages):
-                        try:
-                            page_text = page.extract_text()
-                            if page_text:
-                                text_content.append(page_text)
-                        except Exception as e:
-                            logger.warning(f"Failed to extract page {page_num + 1} from {filename}: {e}")
-                            continue
+            def extract_pdf_sync():
+                text_content = []
+                page_count = 0
+                
+                with io.BytesIO(file_content) as pdf_buffer:
+                    with pdfplumber.open(pdf_buffer) as pdf:
+                        page_count = len(pdf.pages)
+                        logger.info(f"Extracting text from {page_count} pages in {filename}")
+                        
+                        for page_num, page in enumerate(pdf.pages):
+                            try:
+                                page_text = page.extract_text()
+                                if page_text:
+                                    text_content.append(page_text)
+                                
+                                if page_num % 10 == 0 and page_num > 0:
+                                    logger.info(f"Processed {page_num}/{page_count} pages from {filename}")
+                                    
+                            except Exception as e:
+                                logger.warning(f"Failed to extract page {page_num + 1} from {filename}: {e}")
+                                continue
+                
+                return text_content, page_count
+            
+            text_content, page_count = await asyncio.to_thread(extract_pdf_sync)
             
             if not text_content:
                 # Fallback to PyPDF2
@@ -97,21 +109,33 @@ class TextExtractor:
     async def _extract_pdf_fallback(self, file_content: bytes, filename: str) -> Dict:
         """Fallback PDF extraction using PyPDF2"""
         try:
-            text_content = []
-            page_count = 0
+            import asyncio
             
-            with io.BytesIO(file_content) as pdf_buffer:
-                pdf_reader = PyPDF2.PdfReader(pdf_buffer)
-                page_count = len(pdf_reader.pages)
+            def extract_pdf_fallback_sync():
+                text_content = []
+                page_count = 0
                 
-                for page_num, page in enumerate(pdf_reader.pages):
-                    try:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text_content.append(page_text)
-                    except Exception as e:
-                        logger.warning(f"Failed to extract page {page_num + 1} from {filename}: {e}")
-                        continue
+                with io.BytesIO(file_content) as pdf_buffer:
+                    pdf_reader = PyPDF2.PdfReader(pdf_buffer)
+                    page_count = len(pdf_reader.pages)
+                    logger.info(f"PyPDF2 fallback: extracting text from {page_count} pages in {filename}")
+                    
+                    for page_num, page in enumerate(pdf_reader.pages):
+                        try:
+                            page_text = page.extract_text()
+                            if page_text:
+                                text_content.append(page_text)
+                                
+                            if page_num % 10 == 0 and page_num > 0:
+                                logger.info(f"PyPDF2: Processed {page_num}/{page_count} pages from {filename}")
+                                
+                        except Exception as e:
+                            logger.warning(f"Failed to extract page {page_num + 1} from {filename}: {e}")
+                            continue
+                
+                return text_content, page_count
+            
+            text_content, page_count = await asyncio.to_thread(extract_pdf_fallback_sync)
             
             full_text = "\n\n".join(text_content)
             
