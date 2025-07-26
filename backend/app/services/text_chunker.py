@@ -53,7 +53,7 @@ class TextChunker:
                     start_pos = sum(len(chunks[j]) for j in range(i))
                 
                 chunk_obj = {
-                    "id": str(uuid.uuid4()),
+                    "chunk_id": str(uuid.uuid4()),
                     "doc_id": doc_id,
                     "chunk_index": i,
                     "text": chunk_text.strip(),
