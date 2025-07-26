@@ -30,15 +30,15 @@ class RedisClient:
             return
             
         try:
-            # Use IP address instead of hostname to avoid IDNA encoding issues
-            redis_host = "23.22.188.206"  # Your Redis Cloud IP
+            # Use hostname from environment settings
+            redis_host = settings.redis_host
             redis_port = int(settings.redis_port)
             redis_password = settings.redis_password
             
             logger.info(f"Connecting to Redis Cloud at {redis_host}:{redis_port}")
             
             
-            # Connect using IP address with SSL and improved settings for concurrency
+            # Connect using hostname with SSL and improved settings for concurrency
             self.client = redis.Redis(
                 host=redis_host,
                 port=redis_port,
@@ -70,8 +70,8 @@ class RedisClient:
     def _try_fallback_connection(self):
         """Fallback connection method"""
         try:
-            # Alternative approach using redis.from_url with IP
-            redis_url = f"rediss://default:{settings.redis_password}@23.22.188.206:{settings.redis_port}"
+            # Alternative approach using redis.from_url with hostname
+            redis_url = f"rediss://default:{settings.redis_password}@{settings.redis_host}:{settings.redis_port}"
             
             logger.info("Attempting fallback Redis connection...")
             
