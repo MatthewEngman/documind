@@ -166,6 +166,57 @@ async def get_document_chunks(
         logger.error(f"Get chunks error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@router.post("/batch-upload")
+async def batch_upload_documents(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...)
+):
+    """Upload and process multiple documents concurrently"""
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        if len(files) > 10:
+            raise HTTPException(status_code=400, detail="Too many files. Maximum 10 files per batch.")
+        
+        batch_id = str(uuid.uuid4())
+        doc_ids = []
+        
+        for i, file in enumerate(files):
+            file_content = await file.read()
+            if not file_content:
+                continue
+                
+            doc_id = str(uuid.uuid4())
+            doc_ids.append({
+                "doc_id": doc_id,
+                "filename": file.filename,
+                "size": len(file_content)
+            })
+            
+            document_processor._update_status(doc_id, "queued", 0)
+            
+            background_tasks.add_task(
+                _process_document_background,
+                doc_id,
+                file_content,
+                file.filename
+            )
+        
+        return JSONResponse(
+            status_code=202,
+            content={
+                "message": f"Batch of {len(doc_ids)} documents queued for processing",
+                "batch_id": batch_id,
+                "documents": doc_ids,
+                "status": "queued"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Batch upload error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @router.get("/{doc_id}/status")
 async def get_processing_status(doc_id: str):
     """Get document processing status"""

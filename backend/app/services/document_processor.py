@@ -366,6 +366,49 @@ class DocumentProcessor:
         """Get document by ID"""
         return redis_client.get_json(f"doc:{doc_id}")
     
+    async def process_documents_batch(self, documents_data: List[Dict]) -> List[Dict]:
+        """Process multiple documents concurrently with controlled concurrency"""
+        MAX_CONCURRENT_DOCS = 3
+        
+        async def process_single_doc(doc_data):
+            try:
+                return await self.process_document(
+                    doc_data["file_content"],
+                    doc_data["filename"],
+                    doc_data.get("doc_id")
+                )
+            except Exception as e:
+                logger.error(f"Batch processing failed for {doc_data['filename']}: {e}")
+                if doc_data.get("doc_id"):
+                    self._update_status(doc_data["doc_id"], "failed", 0, str(e))
+                raise
+        
+        results = []
+        for i in range(0, len(documents_data), MAX_CONCURRENT_DOCS):
+            batch = documents_data[i:i + MAX_CONCURRENT_DOCS]
+            logger.info(f"Processing document batch {i//MAX_CONCURRENT_DOCS + 1}/{(len(documents_data)-1)//MAX_CONCURRENT_DOCS + 1}")
+            
+            batch_tasks = [process_single_doc(doc_data) for doc_data in batch]
+            
+            try:
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                
+                for j, result in enumerate(batch_results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Document processing failed: {result}")
+                        results.append({"error": str(result), "filename": batch[j]["filename"]})
+                    else:
+                        results.append(result)
+                
+                if i + MAX_CONCURRENT_DOCS < len(documents_data):
+                    await asyncio.sleep(0.5)
+                    
+            except Exception as e:
+                logger.error(f"Batch processing error: {e}")
+                raise
+        
+        return results
+
     async def list_documents(self, limit: int = 20, offset: int = 0) -> List[Dict]:
         """List all documents with pagination"""
         try:

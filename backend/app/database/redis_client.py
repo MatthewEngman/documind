@@ -3,6 +3,7 @@ import ssl
 import socket
 import json
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 from app.config import settings
 
@@ -41,7 +42,7 @@ class RedisClient:
             ssl_context.check_hostname = False  # Critical for IP connections
             ssl_context.verify_mode = ssl.CERT_NONE  # Redis Cloud compatible
             
-            # Connect using IP address with SSL
+            # Connect using IP address with SSL and improved settings for concurrency
             self.client = redis.Redis(
                 host=redis_host,
                 port=redis_port,
@@ -49,10 +50,13 @@ class RedisClient:
                 ssl=True,
                 ssl_context=ssl_context,
                 decode_responses=True,
-                socket_connect_timeout=10,
-                socket_timeout=10,
+                socket_connect_timeout=15,
+                socket_timeout=15,
                 retry_on_timeout=True,
-                health_check_interval=30
+                health_check_interval=30,
+                max_connections=20,
+                socket_keepalive=True,
+                socket_keepalive_options={}
             )
             
             # Test connection
@@ -406,6 +410,27 @@ class EnhancedMockRedisClient(MockRedisClient):
             })
         
         return results
+    
+    def incrby(self, key: str, amount: int) -> int:
+        """Increment counter by amount"""
+        current = int(self._data.get(key, 0))
+        new_value = current + amount
+        self._data[key] = str(new_value)
+        return new_value
+    
+    def decrby(self, key: str, amount: int) -> int:
+        """Decrement counter by amount"""
+        current = int(self._data.get(key, 0))
+        new_value = current - amount
+        self._data[key] = str(new_value)
+        return new_value
+    
+    def decr(self, key: str) -> int:
+        """Decrement counter"""
+        current = int(self._data.get(key, 0))
+        new_value = current - 1
+        self._data[key] = str(new_value)
+        return new_value
 
 
 class MockSearchIndex:
@@ -434,6 +459,25 @@ class MockDoc:
         self.content = f"Mock content {i+1}"
         self.doc_id = f"mock_doc_{i}"
 
+
+    async def execute_with_retry(self, operation, *args, max_retries=3, **kwargs):
+        """Execute Redis operation with retry logic"""
+        for attempt in range(max_retries):
+            try:
+                if not self._connected:
+                    self.connect()
+                return await asyncio.to_thread(operation, *args, **kwargs)
+            except Exception as e:
+                logger.warning(f"Redis operation failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    raise
+                await asyncio.sleep(0.5 * (attempt + 1))
+    
+    def set_json_with_retry(self, key: str, data: Dict, ttl: Optional[int] = None):
+        """Store JSON data with retry logic"""
+        return asyncio.create_task(
+            self.execute_with_retry(self.client.set, key, json.dumps(data), ex=ttl)
+        )
 
 # Global Redis client instance
 redis_client = RedisClient()

@@ -11,21 +11,38 @@ const apiClient = axios.create({
 });
 
 // Request interceptor for logging
-apiClient.interceptors.request.use((config) => {
-  console.log(`🔄 ${config.method?.toUpperCase()} ${config.url}`);
-  return config;
-});
+apiClient.interceptors.request.use(
+  (config) => {
+    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    return config;
+  },
+  (error) => {
+    console.error('❌ Request Error:', error);
+    return Promise.reject(error);
+  }
+);
 
-// Add better error handling for production
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log(`✅ API Response: ${response.status} ${response.config.url}`);
+    return response;
+  },
   async (error) => {
-    // Add retry logic for production
-    if (error.response?.status >= 500 && !error.config._retry) {
-      error.config._retry = true;
-      console.log('🔄 Retrying request due to server error...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return apiClient.request(error.config);
+    const config = error.config;
+    
+    // Add retry logic for network errors and server errors
+    if ((error.response?.status >= 500 || error.code === 'NETWORK_ERROR') && !config._retry) {
+      config._retry = true;
+      config._retryCount = (config._retryCount || 0) + 1;
+      
+      if (config._retryCount <= 3) {
+        console.log(`🔄 Retrying request (${config._retryCount}/3) due to ${error.response?.status || error.code}...`);
+        
+        const delay = Math.min(1000 * Math.pow(2, config._retryCount - 1), 5000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        return apiClient.request(config);
+      }
     }
     
     console.error('❌ API Error:', error.response?.data || error.message);
@@ -142,6 +159,21 @@ export const documentApi = {
 
   getStatus: async (docId: string) => {
     const response = await apiClient.get(`/api/documents/${docId}/status`);
+    return response.data;
+  },
+
+  batchUpload: async (files: File[]): Promise<any> => {
+    const formData = new FormData();
+    files.forEach((file, index) => {
+      formData.append('files', file);
+    });
+    
+    const response = await apiClient.post('/api/documents/batch-upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 300000,
+    });
     return response.data;
   },
 };
