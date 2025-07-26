@@ -94,8 +94,8 @@ class DocumentProcessor:
             # Store chunks and create chunk index
             chunk_ids = []
             for chunk in chunks:
-                redis_client.set_json(f"doc:chunk:{chunk['id']}", chunk)
-                chunk_ids.append(chunk['id'])
+                redis_client.set_json(f"doc:chunk:{chunk['chunk_id']}", chunk)
+                chunk_ids.append(chunk['chunk_id'])
             
             # Store chunk index for this document
             redis_client.set_json(f"doc:chunks:{doc_id}", {
@@ -120,7 +120,7 @@ class DocumentProcessor:
                 chunks_data = []
                 for chunk in chunks:
                     chunk_data = {
-                        "chunk_id": chunk["id"],
+                        "chunk_id": chunk["chunk_id"],
                         "doc_id": doc_id,
                         "text": chunk["text"],
                         "start_char": chunk.get("start_char", 0),
