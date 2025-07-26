@@ -30,88 +30,104 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
 
     setUploads(prev => [...prev, ...newUploads]);
 
-    // Process each file
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      const file = acceptedFiles[i];
-      const uploadIndex = uploads.length + i;
-
-      try {
-        // Update progress to processing
-        setUploads(prev => prev.map((upload, idx) => 
-          idx === uploadIndex 
-            ? { ...upload, status: 'processing', progress: 50 }
-            : upload
-        ));
-
-        // Upload file
-        const result = await documentApi.upload(file);
+    const MAX_CONCURRENT_UPLOADS = 3;
+    
+    const processFilesConcurrently = async () => {
+      const uploadPromises = acceptedFiles.map(async (file, index) => {
+        const uploadIndex = uploads.length + index;
         
-        const docId = result.doc_id;
-        let completed = false;
-        let attempts = 0;
-        const maxAttempts = 120;
-        
-        while (!completed && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+          // Update progress to processing
+          setUploads(prev => prev.map((upload, idx) => 
+            idx === uploadIndex 
+              ? { ...upload, status: 'processing', progress: 50 }
+              : upload
+          ));
+
+          // Upload file
+          const result = await documentApi.upload(file);
           
-          try {
-            const statusResult = await documentApi.getStatus(docId);
+          const docId = result.doc_id;
+          let completed = false;
+          let attempts = 0;
+          const maxAttempts = 120;
+          
+          while (!completed && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Update progress
-            setUploads(prev => prev.map((upload, idx) => 
-              idx === uploadIndex 
-                ? { 
-                    ...upload, 
-                    status: statusResult.status === 'completed' ? 'success' : 'processing',
-                    progress: statusResult.progress 
-                  }
-                : upload
-            ));
-            
-            if (statusResult.status === 'completed') {
-              completed = true;
-              // Update to success
+            try {
+              const statusResult = await documentApi.getStatus(docId);
+              
+              // Update progress
               setUploads(prev => prev.map((upload, idx) => 
                 idx === uploadIndex 
                   ? { 
                       ...upload, 
-                      status: 'success', 
-                      progress: 100,
-                      docId: docId 
+                      status: statusResult.status === 'completed' ? 'success' : 'processing',
+                      progress: statusResult.progress 
                     }
                   : upload
               ));
               
-              toast.success(`${file.name} uploaded successfully!`);
-              onUploadSuccess();
-            } else if (statusResult.status === 'failed') {
-              throw new Error(statusResult.message || 'Processing failed');
-            }
-          } catch (statusError) {
-            if (attempts === maxAttempts - 1) {
-              throw new Error('Processing timeout - please try again');
-            }
-          }
-          
-          attempts++;
-        }
-
-      } catch (error: any) {
-        // Update progress to error
-        setUploads(prev => prev.map((upload, idx) => 
-          idx === uploadIndex 
-            ? { 
-                ...upload, 
-                status: 'error', 
-                progress: 0,
-                error: error.response?.data?.detail || error.message 
+              if (statusResult.status === 'completed') {
+                completed = true;
+                // Update to success
+                setUploads(prev => prev.map((upload, idx) => 
+                  idx === uploadIndex 
+                    ? { 
+                        ...upload, 
+                        status: 'success', 
+                        progress: 100,
+                        docId: docId 
+                      }
+                    : upload
+                ));
+                
+                toast.success(`${file.name} uploaded successfully!`);
+                onUploadSuccess();
+                return { success: true, file: file.name };
+              } else if (statusResult.status === 'failed') {
+                throw new Error(statusResult.message || 'Processing failed');
               }
-            : upload
-        ));
+            } catch (statusError) {
+              if (attempts === maxAttempts - 1) {
+                throw new Error('Processing timeout - please try again');
+              }
+            }
+            
+            attempts++;
+          }
 
-        toast.error(`Failed to upload ${file.name}`);
+        } catch (error: any) {
+          // Update progress to error
+          setUploads(prev => prev.map((upload, idx) => 
+            idx === uploadIndex 
+              ? { 
+                  ...upload, 
+                  status: 'error', 
+                  progress: 0,
+                  error: error.response?.data?.detail || error.message 
+                }
+              : upload
+          ));
+
+          toast.error(`Failed to upload ${file.name}`);
+          return { success: false, file: file.name, error: error.message };
+        }
+      });
+
+      // Process uploads with controlled concurrency
+      const results = [];
+      for (let i = 0; i < uploadPromises.length; i += MAX_CONCURRENT_UPLOADS) {
+        const batch = uploadPromises.slice(i, i + MAX_CONCURRENT_UPLOADS);
+        const batchResults = await Promise.all(batch);
+        results.push(...batchResults);
       }
-    }
+      
+      return results;
+    };
+
+    await processFilesConcurrently();
   }, [uploads.length, onUploadSuccess]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
