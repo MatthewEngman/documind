@@ -99,7 +99,7 @@ class VectorSearchService:
             for chunk, embedding in zip(chunks_data, embeddings):
                 try:
                     # Prepare vector data for Redis
-                    vector_key = f"vector:{chunk['id']}"
+                    vector_key = f"vector:{chunk['chunk_id']}"
                     
                     # Serialize vector
                     vector_bytes = self._serialize_vector(embedding["vector"])
@@ -111,7 +111,7 @@ class VectorSearchService:
                         "title": chunk.get("title", ""),
                         "filename": chunk.get("filename", ""),
                         "doc_id": doc_id,
-                        "chunk_id": chunk["id"],
+                        "chunk_id": chunk["chunk_id"],
                         "tags": "|".join(chunk.get("tags", [])),
                         "word_count": chunk["word_count"],
                         "chunk_index": chunk.get("chunk_index", 0),
@@ -125,7 +125,7 @@ class VectorSearchService:
                     vectors_added += 1
                     
                 except Exception as e:
-                    logger.error(f"Failed to add vector for chunk {chunk['id']}: {e}")
+                    logger.error(f"Failed to add vector for chunk {chunk['chunk_id']}: {e}")
             
             logger.info(f"Added {vectors_added}/{len(chunks_data)} vectors for document {doc_id}")
             
