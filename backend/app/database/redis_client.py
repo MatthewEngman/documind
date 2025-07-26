@@ -37,10 +37,6 @@ class RedisClient:
             
             logger.info(f"Connecting to Redis Cloud at {redis_host}:{redis_port}")
             
-            # Create SSL context for Redis Cloud
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False  # Critical for IP connections
-            ssl_context.verify_mode = ssl.CERT_NONE  # Redis Cloud compatible
             
             # Connect using IP address with SSL and improved settings for concurrency
             self.client = redis.Redis(
@@ -48,7 +44,8 @@ class RedisClient:
                 port=redis_port,
                 password=redis_password,
                 ssl=True,
-                ssl_context=ssl_context,
+                ssl_cert_reqs=None,
+                ssl_check_hostname=False,
                 decode_responses=True,
                 socket_connect_timeout=15,
                 socket_timeout=15,

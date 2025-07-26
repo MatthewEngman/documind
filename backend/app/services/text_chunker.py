@@ -48,6 +48,10 @@ class TextChunker:
                 if len(chunk_text.strip()) < self.min_chunk_size:
                     continue
                 
+                start_pos = 0
+                if i > 0:
+                    start_pos = sum(len(chunks[j]) for j in range(i))
+                
                 chunk_obj = {
                     "id": str(uuid.uuid4()),
                     "doc_id": doc_id,
@@ -55,6 +59,8 @@ class TextChunker:
                     "text": chunk_text.strip(),
                     "word_count": len(chunk_text.split()),
                     "char_count": len(chunk_text),
+                    "start_char": start_pos,
+                    "end_char": start_pos + len(chunk_text),
                     "created_at": datetime.utcnow().isoformat(),
                     "metadata": {
                         "source_filename": metadata.get("filename", "unknown"),

@@ -86,6 +86,10 @@ class VectorSearchService:
             if not self.initialized:
                 await self.initialize_vector_index()
             
+            logger.info(f"Processing {len(chunks_data)} chunks for document {doc_id}")
+            if chunks_data:
+                logger.info(f"First chunk keys: {list(chunks_data[0].keys())}")
+            
             # Generate embeddings for all chunks
             chunk_texts = [chunk["text"] for chunk in chunks_data]
             embeddings = await embedding_service.generate_batch_embeddings(chunk_texts)

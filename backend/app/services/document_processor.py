@@ -123,8 +123,8 @@ class DocumentProcessor:
                         "chunk_id": chunk["id"],
                         "doc_id": doc_id,
                         "text": chunk["text"],
-                        "start_char": chunk["start_char"],
-                        "end_char": chunk["end_char"],
+                        "start_char": chunk.get("start_char", 0),
+                        "end_char": chunk.get("end_char", 0),
                         "word_count": chunk["word_count"],
                         "chunk_index": chunk["chunk_index"],
                         "metadata": chunk["metadata"],
@@ -136,6 +136,9 @@ class DocumentProcessor:
                     chunks_data.append(chunk_data)
                 
                 # Generate and store vectors
+                logger.info(f"Passing {len(chunks_data)} chunks_data to vector service")
+                if chunks_data:
+                    logger.info(f"chunks_data[0] keys: {list(chunks_data[0].keys())}")
                 vectors_added = await vector_search_service.add_document_vectors(doc_id, chunks_data)
                 document["vectors_generated"] = vectors_added
                 
