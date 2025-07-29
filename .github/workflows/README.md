@@ -22,6 +22,7 @@ The service account needs these IAM roles:
 - Cloud Run Admin
 - Service Account User
 - Storage Admin (for container registry)
+- Artifact Registry Writer (for Cloud Run source deployments)
 
 ### Manual Setup
 
