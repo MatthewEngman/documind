@@ -25,45 +25,31 @@ class RedisClient:
             RedisClient._initialized = True
     
     def connect(self):
-        """Establish Redis connection using IP to avoid IDNA issues"""
+        """Establish Redis connection using proper Redis Cloud URL"""
         if self._connected:
             return
             
         try:
-            # Use IP address instead of hostname to avoid IDNA encoding issues
-            redis_host = "23.22.188.206"  # Your Redis Cloud IP
-            redis_port = int(settings.redis_port)
-            redis_password = settings.redis_password
+            # Use Redis Cloud URL format for proper connection
+            redis_url = f"redis://default:{settings.redis_password}@{settings.redis_host}:{settings.redis_port}"
             
-            logger.info(f"Connecting to Redis Cloud at {redis_host}:{redis_port}")
+            logger.info(f"Connecting to Redis Cloud at {settings.redis_host}:{settings.redis_port}")
             
-            # Create SSL context for Redis Cloud
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False  # Critical for IP connections
-            ssl_context.verify_mode = ssl.CERT_NONE  # Redis Cloud compatible
-            
-            # Connect using IP address with SSL and improved settings for concurrency
-            self.client = redis.Redis(
-                host=redis_host,
-                port=redis_port,
-                password=redis_password,
-                ssl=True,
-                ssl_cert_reqs=ssl.CERT_NONE,
-                ssl_check_hostname=False,
+            # Connect using redis.from_url for Redis Cloud compatibility
+            self.client = redis.from_url(
+                redis_url,
                 decode_responses=True,
-                socket_connect_timeout=15,
-                socket_timeout=15,
+                socket_connect_timeout=30,
+                socket_timeout=30,
                 retry_on_timeout=True,
                 health_check_interval=30,
-                max_connections=20,
-                socket_keepalive=True,
-                socket_keepalive_options={}
+                max_connections=20
             )
             
             # Test connection
             self.client.ping()
             self._connected = True
-            logger.info(f"✅ Redis connected successfully to {redis_host}:{redis_port}")
+            logger.info(f"✅ Redis connected successfully to {settings.redis_host}:{settings.redis_port}")
             return
             
         except Exception as e:
@@ -74,18 +60,18 @@ class RedisClient:
     def _try_fallback_connection(self):
         """Fallback connection method"""
         try:
-            # Alternative approach using redis.from_url with IP
-            redis_url = f"rediss://default:{settings.redis_password}@23.22.188.206:{settings.redis_port}"
+            # Try with SSL (rediss://) for Redis Cloud
+            redis_url = f"rediss://default:{settings.redis_password}@{settings.redis_host}:{settings.redis_port}"
             
-            logger.info("Attempting fallback Redis connection...")
+            logger.info("Attempting fallback Redis connection with SSL...")
             
             self.client = redis.from_url(
                 redis_url,
                 ssl_cert_reqs=None,
                 ssl_check_hostname=False,
                 decode_responses=True,
-                socket_connect_timeout=15,
-                socket_timeout=15
+                socket_connect_timeout=30,
+                socket_timeout=30
             )
             
             self.client.ping()
