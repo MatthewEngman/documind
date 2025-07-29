@@ -1,0 +1,40 @@
+# Include all files by default
+# Only exclude specific files we don't want
+
+# Exclude development files
+.env
+.venv
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.mypy_cache
+.pytest_cache
+.coverage
+.coverage.*
+*.log
+
+# Exclude test files
+test_*.py
+*_test.py
+
+# Exclude uploads directory
+uploads/
+
+# Exclude git files
+.git/
+.gitignore
+
+# Exclude IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Explicitly include requirements.txt (this should be included by default)
+!requirements.txt
+!app/
+!Dockerfile
+!start.sh
