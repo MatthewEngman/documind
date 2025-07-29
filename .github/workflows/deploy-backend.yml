@@ -46,7 +46,7 @@ jobs:
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars="REDIS_HOST=${{ secrets.REDIS_HOST }},REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" \
+          --set-env-vars="REDIS_HOST=${{ secrets.REDIS_HOST }},REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }},REDIS_REQUIRED=false" \
           --memory=1Gi \
           --cpu=1 \
           --max-instances=10 \
