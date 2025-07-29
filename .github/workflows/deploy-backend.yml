@@ -40,15 +40,18 @@ jobs:
       
     - name: Build and Deploy to Cloud Run
       run: |
+        # Get the project ID from gcloud config
+        PROJECT_ID=$(gcloud config get-value project)
+        
         # Build the Docker image
-        docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/documind-backend ./backend
+        docker build -t gcr.io/$PROJECT_ID/documind-backend ./backend
         
         # Push the image to Google Container Registry
-        docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/documind-backend
+        docker push gcr.io/$PROJECT_ID/documind-backend
         
         # Deploy to Cloud Run using the pushed image
         gcloud run deploy documind-backend \
-          --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/documind-backend \
+          --image gcr.io/$PROJECT_ID/documind-backend \
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
