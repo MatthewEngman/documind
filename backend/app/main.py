@@ -61,7 +61,6 @@ app = FastAPI(
 # Configure CORS - Production-ready configuration
 allowed_origins = [
     "https://documind-ruby.vercel.app",  # Production frontend
-    "https://*.vercel.app",  # All Vercel deployments
     "http://localhost:3000",  # Local development
     "http://localhost:3001",  # Local development (alternative port)
     "http://127.0.0.1:3000",  # Local development
@@ -73,13 +72,39 @@ frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url:
     allowed_origins.append(frontend_url)
 
+# For production, allow all Vercel domains if needed
+if os.getenv("ENVIRONMENT") == "production":
+    allowed_origins.extend([
+        "https://*.vercel.app",
+        "https://vercel.app",
+    ])
+
+logger.info(f"CORS allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["*"] if os.getenv("CORS_ALLOW_ALL") == "true" else allowed_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
+    expose_headers=["*"],
 )
+
+# CORS preflight handler
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle CORS preflight requests"""
+    return {"message": "OK"}
 
 # Health check endpoint
 @app.get("/health")
