@@ -10,8 +10,9 @@ Automatically deploys the FastAPI backend to Google Cloud Run when:
 
 Configure these in your GitHub repository settings under Settings > Secrets and variables > Actions:
 
-- `GCP_SERVICE_ACCOUNT_KEY`: JSON key for Google Cloud service account with Cloud Run deployment permissions
 - `GCP_PROJECT_ID`: Your Google Cloud project ID
+- `WIF_PROVIDER`: Workload Identity Federation provider (format: `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID`)
+- `WIF_SERVICE_ACCOUNT`: Service account email for impersonation (format: `SERVICE_ACCOUNT_NAME@PROJECT_ID.iam.gserviceaccount.com`)
 - `REDIS_HOST`: Redis Cloud host URL
 - `REDIS_PASSWORD`: Redis Cloud password
 
@@ -24,10 +25,8 @@ The service account needs these IAM roles:
 
 ### Manual Setup
 
-1. Create a service account in Google Cloud Console
-2. Download the JSON key file
-3. Add the key content as `GCP_SERVICE_ACCOUNT_KEY` secret in GitHub
-4. Add other required secrets
-5. Push changes to trigger deployment
+1. Follow the Workload Identity Federation setup guide in `docs/deployment/WORKLOAD_IDENTITY_SETUP.md`
+2. Add the required secrets to GitHub repository settings
+3. Push changes to trigger deployment
 
 The workflow will automatically deploy the backend and test the health endpoint.
