@@ -33,10 +33,11 @@ class VectorSearchService:
             
             # Check if index already exists
             try:
-                info = redis_client.client.ft(self.vector_index_name).info()
-                logger.info(f"Vector index '{self.vector_index_name}' already exists")
-                self.initialized = True
-                return
+                if redis_client.client:
+                    info = redis_client.client.ft(self.vector_index_name).info()
+                    logger.info(f"Vector index '{self.vector_index_name}' already exists")
+                    self.initialized = True
+                    return
             except:
                 pass
             
@@ -63,13 +64,14 @@ class VectorSearchService:
             ]
             
             # Create index
-            redis_client.client.ft(self.vector_index_name).create_index(
-                schema,
-                definition=IndexDefinition(
-                    prefix=["vector:"],
-                    index_type=IndexType.HASH
+            if redis_client.client:
+                redis_client.client.ft(self.vector_index_name).create_index(
+                    schema,
+                    definition=IndexDefinition(
+                        prefix=["vector:"],
+                        index_type=IndexType.HASH
+                    )
                 )
-            )
             
             logger.info(f"✅ Vector search index '{self.vector_index_name}' created")
             self.initialized = True
@@ -117,8 +119,9 @@ class VectorSearchService:
                     }
                     
                     # Store in Redis
-                    redis_client.client.hset(vector_key, mapping=vector_data)
-                    vectors_added += 1
+                    if redis_client.client:
+                        redis_client.client.hset(vector_key, mapping=vector_data)
+                        vectors_added += 1
                     
                 except Exception as e:
                     logger.error(f"Failed to add vector for chunk {chunk['chunk_id']}: {e}")
@@ -126,7 +129,8 @@ class VectorSearchService:
             logger.info(f"Added {vectors_added}/{len(chunks_data)} vectors for document {doc_id}")
             
             # Update analytics
-            redis_client.client.incrby("stats:vectors_created", vectors_added)
+            if redis_client.client:
+                redis_client.client.incrby("stats:vectors_created", vectors_added)
             
             return vectors_added
             
@@ -137,7 +141,7 @@ class VectorSearchService:
     async def search_vectors(self, 
                            query: str, 
                            limit: int = 10,
-                           filters: Dict = None,
+                           filters: Optional[Dict] = None,
                            similarity_threshold: float = 0.7) -> List[Dict]:
         """Perform semantic vector search"""
         try:
@@ -167,7 +171,7 @@ class VectorSearchService:
             logger.error(f"Vector search failed: {e}")
             return []
     
-    async def _execute_redis_vector_search(self, query_vector: List[float], filters: Dict, limit: int) -> List[Dict]:
+    async def _execute_redis_vector_search(self, query_vector: List[float], filters: Optional[Dict], limit: int) -> List[Dict]:
         """Execute vector search against Redis Stack"""
         try:
             # Serialize query vector
@@ -177,6 +181,8 @@ class VectorSearchService:
             vector_query = f"*=>[KNN {limit} @vector $query_vector AS score]"
             
             # Execute search
+            if not redis_client.client:
+                raise Exception("Redis client not available")
             results = redis_client.client.ft(self.vector_index_name).search(
                 vector_query,
                 query_params={"query_vector": query_blob}
@@ -198,16 +204,20 @@ class VectorSearchService:
             logger.error(f"Redis Stack vector search failed: {e}")
             raise
     
-    async def _execute_fallback_vector_search(self, query_vector: List[float], filters: Dict, limit: int) -> List[Dict]:
+    async def _execute_fallback_vector_search(self, query_vector: List[float], filters: Optional[Dict], limit: int) -> List[Dict]:
         """Fallback vector search using manual similarity calculation"""
         try:
             # Get all vector keys
+            if not redis_client.client:
+                return []
             vector_keys = redis_client.client.keys("vector:*")
             
             similarities = []
             
             for key in vector_keys:
                 try:
+                    if not redis_client.client:
+                        continue
                     vector_data = redis_client.client.hgetall(key)
                     if not vector_data:
                         continue
@@ -298,6 +308,8 @@ class VectorSearchService:
         """Delete all vectors for a document"""
         try:
             # Get all vector keys for the document
+            if not redis_client.client:
+                return False
             all_keys = redis_client.client.keys("vector:*")
             deleted_count = 0
             
@@ -316,7 +328,8 @@ class VectorSearchService:
             logger.info(f"Deleted {deleted_count} vectors for document {doc_id}")
             
             # Update analytics
-            redis_client.client.incrby("stats:vectors_deleted", deleted_count)
+            if redis_client.client:
+                redis_client.client.incrby("stats:vectors_deleted", deleted_count)
             
             return deleted_count > 0
             
@@ -336,6 +349,8 @@ class VectorSearchService:
         """Get vector search statistics"""
         try:
             # Count vector keys
+            if not redis_client.client:
+                return {"status": "error", "error": "Redis client not available"}
             vector_keys = redis_client.client.keys("vector:*")
             total_vectors = len(vector_keys)
             
