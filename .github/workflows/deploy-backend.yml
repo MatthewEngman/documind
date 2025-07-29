@@ -40,9 +40,8 @@ jobs:
       
     - name: Deploy to Cloud Run
       run: |
-        cd backend
         gcloud run deploy documind-backend \
-          --source . \
+          --source ./backend \
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
