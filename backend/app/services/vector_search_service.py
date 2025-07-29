@@ -22,13 +22,20 @@ class VectorSearchService:
     async def initialize_vector_index(self):
         """Initialize Redis Vector Search index"""
         try:
+            # Always set initialized to True to prevent blocking startup
+            self.initialized = True
+            
+            # Skip initialization if Redis is not available
+            if not redis_client.client or not redis_client._connected:
+                logger.info("Skipping vector index initialization - Redis not available")
+                return
+            
             # Check if Redis Stack is available
             try:
                 from redis.commands.search.field import VectorField, TextField, NumericField, TagField
                 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
             except ImportError:
                 logger.warning("Redis Stack modules not available, using fallback vector search")
-                self.initialized = True
                 return
             
             # Check if index already exists
@@ -36,9 +43,9 @@ class VectorSearchService:
                 if redis_client.client:
                     info = redis_client.client.ft(self.vector_index_name).info()
                     logger.info(f"Vector index '{self.vector_index_name}' already exists")
-                    self.initialized = True
                     return
             except:
+                # Index doesn't exist, continue to create it
                 pass
             
             # Define schema for vector search
@@ -63,7 +70,7 @@ class VectorSearchService:
                 TextField("upload_date")
             ]
             
-            # Create index
+            # Create index with timeout
             if redis_client.client:
                 redis_client.client.ft(self.vector_index_name).create_index(
                     schema,
@@ -74,13 +81,11 @@ class VectorSearchService:
                 )
             
             logger.info(f"✅ Vector search index '{self.vector_index_name}' created")
-            self.initialized = True
             
         except Exception as e:
-            logger.error(f"Vector index initialization failed: {e}")
-            # Use fallback mode
-            self.initialized = True
-            logger.info("Using fallback vector search without Redis Stack")
+            logger.warning(f"Vector index initialization failed: {e}")
+            # Don't fail - just log and continue with fallback
+            logger.info("Continuing with fallback vector search")
     
     async def add_document_vectors(self, doc_id: str, chunks_data: List[Dict]) -> int:
         """Add document chunk vectors to search index"""

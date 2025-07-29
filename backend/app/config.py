@@ -13,8 +13,17 @@ class Settings(BaseSettings):
     
     # API Configuration
     api_host: str = "0.0.0.0"
-    api_port: int = int(os.getenv("PORT", "8000"))  # Use PORT env var for Cloud Run
-    debug: bool = os.getenv("ENVIRONMENT", "development") != "production"
+    api_port: int = 8000  # Default port
+    debug: bool = True
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Override port with environment variable for Cloud Run
+        if "PORT" in os.environ:
+            self.api_port = int(os.environ["PORT"])
+        # Override debug based on environment
+        if os.getenv("ENVIRONMENT") == "production":
+            self.debug = False
     
     # OpenAI Configuration (optional)
     openai_api_key: Optional[str] = None

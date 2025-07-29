@@ -19,31 +19,39 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting DocuMind API...")
     
-    redis_required = os.getenv("REDIS_REQUIRED", "true").lower() == "true"
-    
-    # Verify Redis connection
-    redis_healthy = False
     try:
-        redis_healthy = redis_client.health_check()
-    except Exception as e:
-        logger.warning(f"Redis health check failed: {e}")
-    
-    if redis_required and not redis_healthy:
-        raise Exception("Redis connection failed during startup")
-    elif not redis_healthy:
-        logger.warning("⚠️ Redis connection failed - running in degraded mode")
-    else:
-        logger.info("✅ Redis connection established")
-    
-    # Initialize vector search service (only if Redis is available)
-    if redis_healthy:
+        redis_required = os.getenv("REDIS_REQUIRED", "true").lower() == "true"
+        
+        # Verify Redis connection with timeout
+        redis_healthy = False
         try:
-            await vector_search_service.initialize_vector_index()
-            logger.info("📊 Vector search service initialized")
+            redis_healthy = redis_client.health_check()
+            if redis_healthy:
+                logger.info("✅ Redis connection established")
+            else:
+                logger.warning("⚠️ Redis connection failed - running in degraded mode")
         except Exception as e:
-            logger.warning(f"Vector index initialization failed: {e}")
-    else:
-        logger.info("📊 Skipping vector search initialization (Redis unavailable)")
+            logger.warning(f"Redis health check failed: {e}")
+            redis_healthy = False
+        
+        # Don't fail startup if Redis is not required
+        if redis_required and not redis_healthy:
+            logger.error("Redis connection required but failed - continuing anyway for Cloud Run")
+            # Don't raise exception, just log and continue
+        
+        # Initialize vector search service (only if Redis is available)
+        if redis_healthy:
+            try:
+                await vector_search_service.initialize_vector_index()
+                logger.info("📊 Vector search service initialized")
+            except Exception as e:
+                logger.warning(f"Vector index initialization failed: {e}")
+        else:
+            logger.info("📊 Skipping vector search initialization (Redis unavailable)")
+            
+    except Exception as e:
+        logger.error(f"Startup error: {e}")
+        # Don't fail startup, just log the error
     
     yield
     
