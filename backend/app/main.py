@@ -82,10 +82,13 @@ async def health_check():
     """Health check endpoint"""
     redis_healthy = redis_client.health_check()
     
+    from datetime import datetime
+    
     return {
         "status": "healthy" if redis_healthy else "unhealthy",
         "redis": "connected" if redis_healthy else "disconnected",
-        "version": "1.0.0"
+        "version": "1.0.1",
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 # Redis stats endpoint
