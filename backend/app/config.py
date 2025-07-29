@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     
     # API Configuration
     api_host: str = "0.0.0.0"
-    api_port: int = 8000
-    debug: bool = True
+    api_port: int = int(os.getenv("PORT", "8000"))  # Use PORT env var for Cloud Run
+    debug: bool = os.getenv("ENVIRONMENT", "development") != "production"
     
     # OpenAI Configuration (optional)
     openai_api_key: Optional[str] = None
