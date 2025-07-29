@@ -19,7 +19,7 @@ class DocumentProcessor:
     def __init__(self):
         self.processing_status = {}
     
-    async def process_document(self, file_content: bytes, filename: str, doc_id: str = None) -> Dict:
+    async def process_document(self, file_content: bytes, filename: str, doc_id: Optional[str] = None) -> Dict:
         """Process uploaded document through the complete pipeline"""
         if doc_id is None:
             doc_id = str(uuid.uuid4())
@@ -106,11 +106,12 @@ class DocumentProcessor:
             })
             
             # Add to document index
-            redis_client.client.sadd("doc:index", doc_id)
-            
-            # Update statistics
-            redis_client.client.incr("stats:documents_processed")
-            redis_client.client.incrby("stats:chunks_created", len(chunks))
+            if redis_client.client:
+                redis_client.client.sadd("doc:index", doc_id)
+                
+                # Update statistics
+                redis_client.client.incr("stats:documents_processed")
+                redis_client.client.incrby("stats:chunks_created", len(chunks))
             
             # Step 6: Generate and store vectors
             try:
@@ -254,7 +255,7 @@ class DocumentProcessor:
         # Remove duplicates and return
         return list(set(tags))
     
-    def _update_status(self, doc_id: str, status: str, progress: int, error: str = None):
+    def _update_status(self, doc_id: str, status: str, progress: int, error: Optional[str] = None):
         """Update processing status"""
         self.processing_status[doc_id] = {
             "status": status,
@@ -289,13 +290,14 @@ class DocumentProcessor:
         """Clean up any data from failed processing"""
         try:
             # Remove document if it exists
-            redis_client.client.delete(f"doc:{doc_id}")
-            
-            # Remove from index
-            redis_client.client.srem("doc:index", doc_id)
-            
-            # Remove chunks index
-            redis_client.client.delete(f"doc:chunks:{doc_id}")
+            if redis_client.client:
+                redis_client.client.delete(f"doc:{doc_id}")
+                
+                # Remove from index
+                redis_client.client.srem("doc:index", doc_id)
+                
+                # Remove chunks index
+                redis_client.client.delete(f"doc:chunks:{doc_id}")
             
             # Note: Individual chunks would need to be tracked and cleaned up
             # This is a simplified cleanup
@@ -333,23 +335,24 @@ class DocumentProcessor:
             chunks_key = f"doc:chunks:{doc_id}"
             chunks_data = redis_client.get_json(chunks_key)
             
-            if chunks_data and "chunks" in chunks_data:
+            if chunks_data and "chunks" in chunks_data and redis_client.client:
                 # Delete individual chunks
                 for chunk_id in chunks_data["chunks"]:
                     redis_client.client.delete(f"doc:chunk:{chunk_id}")
                 logger.info(f"Deleted {len(chunks_data['chunks'])} chunks for document {doc_id}")
             
             # Delete document metadata
-            redis_client.client.delete(doc_key)
-            
-            # Delete chunks index
-            redis_client.client.delete(chunks_key)
-            
-            # Remove from document index
-            redis_client.client.srem("doc:index", doc_id)
-            
-            # Update analytics
-            redis_client.client.incr("stats:documents_deleted")
+            if redis_client.client:
+                redis_client.client.delete(doc_key)
+                
+                # Delete chunks index
+                redis_client.client.delete(chunks_key)
+                
+                # Remove from document index
+                redis_client.client.srem("doc:index", doc_id)
+                
+                # Update analytics
+                redis_client.client.incr("stats:documents_deleted")
             
             logger.info(f"Document {doc_id} deleted successfully")
             return True
@@ -412,6 +415,8 @@ class DocumentProcessor:
     async def list_documents(self, limit: int = 20, offset: int = 0) -> List[Dict]:
         """List all documents with pagination"""
         try:
+            if not redis_client.client:
+                return []
             doc_ids = list(redis_client.client.smembers("doc:index"))
             doc_ids = [doc_id.decode() if isinstance(doc_id, bytes) else doc_id for doc_id in doc_ids]
             
@@ -434,46 +439,6 @@ class DocumentProcessor:
             logger.error(f"List documents error: {e}")
             return []
     
-    async def delete_document(self, doc_id: str) -> bool:
-        """Delete document and all associated data"""
-        try:
-            # Get document to check if it exists
-            doc = redis_client.get_json(f"doc:{doc_id}")
-            if not doc:
-                return False
-            
-            # Get chunks to delete
-            chunks_data = redis_client.get_json(f"doc:chunks:{doc_id}")
-            if chunks_data and "chunks" in chunks_data:
-                # Delete individual chunks
-                for chunk_id in chunks_data["chunks"]:
-                    redis_client.client.delete(f"doc:chunk:{chunk_id}")
-            
-            # Delete chunks index
-            redis_client.client.delete(f"doc:chunks:{doc_id}")
-            
-            # Delete document
-            redis_client.client.delete(f"doc:{doc_id}")
-            
-            # Remove from index
-            redis_client.client.srem("doc:index", doc_id)
-            
-            # Delete file if it exists
-            if "file_path" in doc:
-                await file_handler.delete_file(doc["file_path"])
-            
-            # Update statistics
-            redis_client.client.decr("stats:documents_processed")
-            if chunks_data:
-                chunk_count = len(chunks_data.get("chunks", []))
-                redis_client.client.decrby("stats:chunks_created", chunk_count)
-            
-            logger.info(f"Document {doc_id} deleted successfully")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Document deletion failed for {doc_id}: {e}")
-            return False
 
 # Global instance
 document_processor = DocumentProcessor()

@@ -274,6 +274,27 @@ class RedisClient:
         """Get current timestamp"""
         from datetime import datetime
         return datetime.utcnow().isoformat()
+    
+    async def execute_with_retry(self, operation, *args, max_retries=3, **kwargs):
+        """Execute Redis operation with retry logic"""
+        for attempt in range(max_retries):
+            try:
+                if not self._connected:
+                    self.connect()
+                return await asyncio.to_thread(operation, *args, **kwargs)
+            except Exception as e:
+                logger.warning(f"Redis operation failed (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    raise
+                await asyncio.sleep(0.5 * (attempt + 1))
+    
+    def set_json_with_retry(self, key: str, data: Dict, ttl: Optional[int] = None):
+        """Store JSON data with retry logic"""
+        if not self.client:
+            raise Exception("Redis client not connected")
+        return asyncio.create_task(
+            self.execute_with_retry(self.client.set, key, json.dumps(data), ex=ttl)
+        )
 
 class MockRedisClient:
     """Mock Redis client for development when connection fails"""
@@ -458,26 +479,6 @@ class MockDoc:
         self.chunk_id = f"mock_chunk_{i}"
         self.content = f"Mock content {i+1}"
         self.doc_id = f"mock_doc_{i}"
-
-
-    async def execute_with_retry(self, operation, *args, max_retries=3, **kwargs):
-        """Execute Redis operation with retry logic"""
-        for attempt in range(max_retries):
-            try:
-                if not self._connected:
-                    self.connect()
-                return await asyncio.to_thread(operation, *args, **kwargs)
-            except Exception as e:
-                logger.warning(f"Redis operation failed (attempt {attempt + 1}/{max_retries}): {e}")
-                if attempt == max_retries - 1:
-                    raise
-                await asyncio.sleep(0.5 * (attempt + 1))
-    
-    def set_json_with_retry(self, key: str, data: Dict, ttl: Optional[int] = None):
-        """Store JSON data with retry logic"""
-        return asyncio.create_task(
-            self.execute_with_retry(self.client.set, key, json.dumps(data), ex=ttl)
-        )
 
 # Global Redis client instance
 redis_client = RedisClient()
