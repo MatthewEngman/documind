@@ -55,14 +55,12 @@ app = FastAPI(
 
 # Configure CORS - Production-ready configuration
 allowed_origins = [
+    "https://documind-ruby.vercel.app",  # Production frontend
     "https://*.vercel.app",  # All Vercel deployments
     "http://localhost:3000",  # Local development
     "http://localhost:3001",  # Local development (alternative port)
     "http://127.0.0.1:3000",  # Local development
     "http://127.0.0.1:3001",  # Local development (alternative port)
-    "https://document-loader-app-tunnel-lfkzbuch.devinapps.com",  # Public frontend tunnel
-    "https://user:35acd6de5955ce776eaeb1e5eab7d418@document-loader-app-tunnel-lfkzbuch.devinapps.com",  # Public frontend tunnel with auth
-    "*",  # Allow all origins for debugging
 ]
 
 # Add environment-specific origins
@@ -72,9 +70,9 @@ if frontend_url:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for debugging
-    allow_credentials=False,  # Disable credentials when allowing all origins
-    allow_methods=["*"],
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
