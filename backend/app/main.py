@@ -87,7 +87,7 @@ async def health_check():
     return {
         "status": "healthy" if redis_healthy else "unhealthy",
         "redis": "connected" if redis_healthy else "disconnected",
-        "version": "1.0.4",
+        "version": "1.0.5",
         "timestamp": datetime.utcnow().isoformat()
     }
 

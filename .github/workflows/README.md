@@ -19,10 +19,8 @@ Configure these in your GitHub repository settings under Settings > Secrets and 
 ### Service Account Permissions
 
 The service account needs these IAM roles:
-- Cloud Run Admin
-- Service Account User
-- Storage Admin (for container registry)
-- Artifact Registry Writer (for Cloud Run source deployments)
+- Cloud Run Source Developer (comprehensive permissions for source deployments)
+- Service Account User (for impersonation)
 
 ### Manual Setup
 
