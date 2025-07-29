@@ -22,7 +22,12 @@ async def lifespan(app: FastAPI):
     redis_required = os.getenv("REDIS_REQUIRED", "true").lower() == "true"
     
     # Verify Redis connection
-    redis_healthy = redis_client.health_check()
+    redis_healthy = False
+    try:
+        redis_healthy = redis_client.health_check()
+    except Exception as e:
+        logger.warning(f"Redis health check failed: {e}")
+    
     if redis_required and not redis_healthy:
         raise Exception("Redis connection failed during startup")
     elif not redis_healthy:
