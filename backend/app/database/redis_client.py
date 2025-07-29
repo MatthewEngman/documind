@@ -102,11 +102,47 @@ class RedisClient:
     def health_check(self) -> bool:
         """Check if Redis connection is healthy"""
         try:
+            import os
+            redis_required = os.getenv("REDIS_REQUIRED", "true").lower() == "true"
+            
+            if not redis_required:
+                # In degraded mode, ensure we have a mock client and return True
+                if not self.client or not isinstance(self.client, (MockRedisClient, EnhancedMockRedisClient)):
+                    self.client = EnhancedMockRedisClient()
+                    self._connected = False
+                return True
+            
             if not self._connected:
                 self.connect()
             if self.client:
                 return self.client.ping()
             return False
+        except:
+            return False
+    
+    def _quick_connection_test(self) -> bool:
+        """Quick Redis connection test with short timeout"""
+        try:
+            redis_host = "23.22.188.206"
+            redis_port = int(settings.redis_port)
+            redis_password = settings.redis_password
+            
+            test_client = redis.Redis(
+                host=redis_host,
+                port=redis_port,
+                password=redis_password,
+                ssl=True,
+                ssl_cert_reqs=ssl.CERT_NONE,
+                ssl_check_hostname=False,
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+                retry_on_timeout=False
+            )
+            
+            test_client.ping()
+            test_client.close()
+            return True
         except:
             return False
     
