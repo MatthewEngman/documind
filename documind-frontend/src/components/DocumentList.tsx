@@ -18,9 +18,10 @@ import toast from 'react-hot-toast';
 interface DocumentListProps {
   refreshTrigger: number;
   onDocumentSelect: (doc: Document) => void;
+  selectedDocument?: Document | null;
 }
 
-const DocumentList: React.FC<DocumentListProps> = ({ refreshTrigger, onDocumentSelect }) => {
+const DocumentList: React.FC<DocumentListProps> = ({ refreshTrigger, onDocumentSelect, selectedDocument }) => {
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [showActions, setShowActions] = useState<string | null>(null);
 
@@ -142,7 +143,11 @@ const DocumentList: React.FC<DocumentListProps> = ({ refreshTrigger, onDocumentS
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ delay: index * 0.05 }}
-              className="bg-white rounded-lg border border-gray-200 hover:shadow-md hover:border-primary-300 transition-all group"
+              className={`bg-white rounded-lg border transition-all group ${
+                selectedDocument?.id === doc.id 
+                  ? 'border-blue-500 shadow-lg ring-2 ring-blue-200 bg-blue-50/50' 
+                  : 'border-gray-200 hover:shadow-md hover:border-primary-300'
+              }`}
             >
               <div className="p-6">
                 <div className="flex items-start justify-between">

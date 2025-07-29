@@ -3,8 +3,8 @@ import { Database, Search, FileText, BarChart3, Upload } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: string;
-  onTabChange: (tab: string) => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
@@ -14,6 +14,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   ];
+
+  // Show tabs only if activeTab and onTabChange are provided
+  const showTabs = activeTab !== undefined && onTabChange !== undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -42,24 +45,26 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
               </div>
             </div>
 
-            {/* Navigation Tabs */}
-            <nav className="flex space-x-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => onTabChange(tab.id)}
-                    className={`nav-tab ${
-                      activeTab === tab.id ? 'active' : ''
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+            {/* Navigation Tabs - Only show if tabs are enabled */}
+            {showTabs && (
+              <nav className="flex space-x-1">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => onTabChange!(tab.id)}
+                      className={`nav-tab ${
+                        activeTab === tab.id ? 'active' : ''
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
 
             {/* Redis Status */}
             <div className="flex items-center space-x-2">
