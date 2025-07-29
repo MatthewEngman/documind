@@ -119,6 +119,9 @@ uploads/
 *.pdf
 *.docx
 *.txt
+# Exception: Allow requirements.txt files
+!requirements.txt
+!*/requirements.txt
 temp/
 cache/
 .pytest_cache/
