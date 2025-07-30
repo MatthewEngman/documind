@@ -42,10 +42,31 @@ class EmbeddingService:
             # Initialize local model as fallback
             if SENTENCE_TRANSFORMERS_AVAILABLE:
                 try:
+                    # Download NLTK data if needed
+                    try:
+                        import nltk
+                        nltk.data.find('tokenizers/punkt')
+                    except LookupError:
+                        logger.info("Downloading required NLTK data...")
+                        nltk.download('punkt', quiet=True)
+                        nltk.download('stopwords', quiet=True)
+                    except Exception as nltk_error:
+                        logger.warning(f"NLTK data download failed: {nltk_error}")
+                    
+                    # Initialize the model with timeout and error handling
+                    import socket
+                    original_timeout = socket.getdefaulttimeout()
+                    socket.setdefaulttimeout(60)  # 60 second timeout for model download
+                    
                     self.local_model = SentenceTransformer('all-MiniLM-L6-v2')
                     logger.info("✅ Local embedding model loaded (all-MiniLM-L6-v2)")
+                    
+                    socket.setdefaulttimeout(original_timeout)
+                    
                 except Exception as e:
                     logger.warning(f"Local model initialization failed: {e}")
+                    logger.info("Continuing without local embedding model")
+                    self.local_model = None
             else:
                 logger.warning("sentence-transformers not available, install for local embeddings")
                 
