@@ -21,8 +21,23 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
   const [uploads, setUploads] = useState<UploadProgress[]>([]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    // Filter out files that are already being uploaded
+    const filteredFiles = acceptedFiles.filter(file => {
+      const isDuplicate = uploads.some(upload => 
+        upload.file.name === file.name && 
+        upload.file.size === file.size &&
+        (upload.status === 'uploading' || upload.status === 'processing')
+      );
+      if (isDuplicate) {
+        toast.error(`${file.name} is already being uploaded`);
+      }
+      return !isDuplicate;
+    });
+
+    if (filteredFiles.length === 0) return;
+
     // Initialize upload progress
-    const newUploads: UploadProgress[] = acceptedFiles.map(file => ({
+    const newUploads: UploadProgress[] = filteredFiles.map(file => ({
       file,
       status: 'uploading',
       progress: 0,
@@ -33,7 +48,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
     const MAX_CONCURRENT_UPLOADS = 3;
     
     const processFilesConcurrently = async () => {
-      const uploadPromises = acceptedFiles.map(async (file, index) => {
+      const uploadPromises = filteredFiles.map(async (file, index) => {
         const uploadIndex = uploads.length + index;
         
         try {
@@ -155,7 +170,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
     };
 
     await processFilesConcurrently();
-  }, [uploads.length, onUploadSuccess]);
+  }, [onUploadSuccess]); // Remove uploads.length dependency to prevent recreation
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
