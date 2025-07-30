@@ -82,7 +82,6 @@ function App() {
             {renderActiveTab()}
           </div>
         </Layout>
-        
         {/* Toast notifications */}
         <Toaster
           position="top-right"
