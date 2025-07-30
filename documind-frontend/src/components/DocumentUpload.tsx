@@ -84,7 +84,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
                 ));
                 
                 toast.success(`${file.name} uploaded successfully!`);
-                onUploadSuccess();
+                
+                // Add a small delay to ensure document is available in API before refreshing list
+                setTimeout(() => {
+                  onUploadSuccess();
+                }, 500);
+                
                 return { success: true, file: file.name };
               } else if (statusResult.status === 'failed') {
                 throw new Error(statusResult.message || 'Processing failed');
