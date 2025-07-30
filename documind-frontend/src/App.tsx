@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
-import DocumentUpload from './components/DocumentUpload';
 import SearchInterface from './components/SearchInterface';
 import DocumentList from './components/DocumentList';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import { RedisShowcase } from './components/RedisShowcase';
+import { PerformanceMetrics } from './components/PerformanceMetrics';
+import { RedisChallenge } from './components/RedisChallenge';
+import CompetitionBanner from './components/CompetitionBanner';
 import { Document, SearchResult } from './services/api';
 
 // Create a client
@@ -46,7 +49,7 @@ function App() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'upload':
-        return <DocumentUpload onUploadSuccess={handleUploadSuccess} />;
+        return null; // DocumentUpload is now rendered within RedisShowcase
       
       case 'search':
         return <SearchInterface onResultClick={handleSearchResultClick} />;
@@ -63,7 +66,7 @@ function App() {
         return <AnalyticsDashboard />;
       
       default:
-        return <DocumentUpload onUploadSuccess={handleUploadSuccess} />;
+        return null; // DocumentUpload is now rendered within RedisShowcase
     }
   };
 
@@ -72,10 +75,13 @@ function App() {
       <div className="min-h-screen bg-gray-50">
         <Layout activeTab={activeTab} onTabChange={setActiveTab}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <CompetitionBanner />
+            <RedisShowcase activeTab={activeTab} onUploadSuccess={handleUploadSuccess} />
+            <PerformanceMetrics />
+            <RedisChallenge />
             {renderActiveTab()}
           </div>
         </Layout>
-        
         {/* Toast notifications */}
         <Toaster
           position="top-right"
