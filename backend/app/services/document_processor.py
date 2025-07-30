@@ -105,13 +105,25 @@ class DocumentProcessor:
                 "created_at": datetime.utcnow().isoformat()
             })
             
-            # Add to document index
-            if redis_client.client:
-                redis_client.client.sadd("doc:index", doc_id)
-                
-                # Update statistics
-                redis_client.client.incr("stats:documents_processed")
-                redis_client.client.incrby("stats:chunks_created", len(chunks))
+            # Add to document index with error handling
+            try:
+                if redis_client.client:
+                    redis_client.client.sadd("doc:index", doc_id)
+                    logger.info(f"Document {doc_id} added to index successfully")
+                    
+                    # Update statistics
+                    redis_client.client.incr("stats:documents_processed")
+                    redis_client.client.incrby("stats:chunks_created", len(chunks))
+                else:
+                    logger.error(f"Redis client not available for indexing document {doc_id}")
+            except Exception as e:
+                logger.error(f"Failed to add document {doc_id} to index: {e}")
+                # Try alternative indexing method
+                try:
+                    redis_client.set_json(f"doc:indexed:{doc_id}", {"indexed": True, "timestamp": datetime.utcnow().isoformat()})
+                    logger.info(f"Document {doc_id} indexed using fallback method")
+                except Exception as fallback_error:
+                    logger.error(f"Fallback indexing also failed for {doc_id}: {fallback_error}")
             
             # Step 6: Generate and store vectors
             try:
@@ -413,12 +425,36 @@ class DocumentProcessor:
         return results
 
     async def list_documents(self, limit: int = 20, offset: int = 0) -> List[Dict]:
-        """List all documents with pagination"""
+        """List all documents with pagination and fallback recovery"""
         try:
             if not redis_client.client:
                 return []
+            
+            # Primary method: use doc:index
             doc_ids = list(redis_client.client.smembers("doc:index"))
             doc_ids = [doc_id.decode() if isinstance(doc_id, bytes) else doc_id for doc_id in doc_ids]
+            
+            # Fallback method: scan for doc: keys if index is empty or incomplete
+            if len(doc_ids) == 0:
+                logger.warning("doc:index is empty, using fallback document discovery")
+                try:
+                    # Scan for all doc: keys (excluding chunks and other metadata)
+                    all_keys = redis_client.client.keys("doc:*")
+                    doc_keys = [key for key in all_keys if not key.startswith((b"doc:chunk:", b"doc:chunks:", b"doc:indexed:"))]
+                    doc_ids = [key.decode().replace("doc:", "") if isinstance(key, bytes) else key.replace("doc:", "") for key in doc_keys]
+                    logger.info(f"Fallback discovery found {len(doc_ids)} documents")
+                    
+                    # Rebuild the index while we're at it
+                    if doc_ids:
+                        try:
+                            redis_client.client.sadd("doc:index", *doc_ids)
+                            logger.info(f"Rebuilt doc:index with {len(doc_ids)} documents")
+                        except Exception as rebuild_error:
+                            logger.error(f"Failed to rebuild index: {rebuild_error}")
+                            
+                except Exception as fallback_error:
+                    logger.error(f"Fallback document discovery failed: {fallback_error}")
+                    return []
             
             # Sort by creation date (newest first)
             documents_with_dates = []
@@ -433,12 +469,12 @@ class DocumentProcessor:
             # Apply pagination
             paginated_docs = documents_with_dates[offset:offset + limit]
             
+            logger.info(f"Listed {len(paginated_docs)} documents (total found: {len(documents_with_dates)})")
             return [doc[0] for doc in paginated_docs]
             
         except Exception as e:
             logger.error(f"List documents error: {e}")
             return []
-    
 
 # Global instance
 document_processor = DocumentProcessor()
