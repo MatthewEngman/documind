@@ -44,27 +44,41 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
               : upload
           ));
 
-          // Upload file
-          const result = await documentApi.upload(file);
+          // Upload file with progress tracking
+          const result = await documentApi.upload(file, (uploadProgress) => {
+            // Update upload progress in real-time
+            setUploads(prev => prev.map((upload, idx) => 
+              idx === uploadIndex 
+                ? { ...upload, progress: Math.min(uploadProgress, 45) } // Cap at 45% for upload phase
+                : upload
+            ));
+          });
           
           const docId = result.doc_id;
           let completed = false;
           let attempts = 0;
-          const maxAttempts = 120;
+          
+          // Dynamic timeout based on file size (minimum 2 minutes, +1 minute per MB)
+          const fileSizeMB = file.size / (1024 * 1024);
+          const maxAttempts = Math.max(120, 120 + (fileSizeMB * 60)); // 2min base + 1min per MB
+          
+          // Dynamic polling frequency - faster for smaller files, slower for larger ones
+          const pollInterval = fileSizeMB > 5 ? 2000 : 1000; // 2s for large files, 1s for small
           
           while (!completed && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
             
             try {
               const statusResult = await documentApi.getStatus(docId);
               
-              // Update progress
+              // Update progress with better mapping
+              const mappedProgress = statusResult.progress || (45 + (attempts / maxAttempts) * 50); // Start from 45% (after upload)
               setUploads(prev => prev.map((upload, idx) => 
                 idx === uploadIndex 
                   ? { 
                       ...upload, 
                       status: statusResult.status === 'completed' ? 'success' : 'processing',
-                      progress: statusResult.progress 
+                      progress: Math.min(mappedProgress, 99) // Cap at 99% until completed
                     }
                   : upload
               ));
@@ -95,8 +109,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
                 throw new Error(statusResult.message || 'Processing failed');
               }
             } catch (statusError) {
+              // Warn user if processing is taking longer than expected for large files
+              if (fileSizeMB > 5 && attempts === Math.floor(maxAttempts * 0.5)) {
+                toast(`Large file (${fileSizeMB.toFixed(1)}MB) is still processing... This may take a few more minutes.`, {
+                  icon: '⏳',
+                  duration: 5000
+                });
+              }
+              
               if (attempts === maxAttempts - 1) {
-                throw new Error('Processing timeout - please try again');
+                throw new Error(`Processing timeout after ${Math.round(maxAttempts * pollInterval / 1000 / 60)} minutes. Large files may need more time - please try again.`);
               }
             }
             
