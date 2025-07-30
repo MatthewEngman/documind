@@ -13,6 +13,8 @@ from app.services.vector_search_service import vector_search_service
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Version: Bug fixes for duplicate uploads and UI improvements - triggering deployment
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management"""
