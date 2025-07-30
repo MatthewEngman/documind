@@ -126,13 +126,24 @@ export interface SearchAnalytics {
 
 // Document API
 export const documentApi = {
-  upload: async (file: File): Promise<any> => {
+  upload: async (file: File, onProgress?: (progress: number) => void): Promise<any> => {
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Calculate dynamic timeout based on file size (minimum 2 minutes, +30s per MB)
+    const fileSizeMB = file.size / (1024 * 1024);
+    const dynamicTimeout = Math.max(120000, 120000 + (fileSizeMB * 30000)); // 2min base + 30s per MB
     
     const response = await apiClient.post('/api/documents/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+      },
+      timeout: dynamicTimeout,
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(progress);
+        }
       },
     });
     return response.data;
