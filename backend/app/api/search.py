@@ -186,37 +186,55 @@ async def get_search_analytics():
     Get search analytics and statistics
     """
     try:
-        # Get various analytics from Redis
-        total_searches = redis_client.client.get("stats:total_searches") or 0
-        cache_hits = redis_client.client.get("stats:cache_hits") or 0
-        
-        # Get recent response times
-        response_times = redis_client.client.lrange("stats:response_times", 0, 99)
+        # Initialize default values
+        total_searches = 0
+        cache_hits = 0
         avg_response_time = 0
-        if response_times:
-            times = [float(t) for t in response_times if t]
-            avg_response_time = sum(times) / len(times) if times else 0
-        
-        # Get popular queries
-        popular_queries = redis_client.client.zrevrange("stats:popular_queries", 0, 9, withscores=True)
         popular_list = []
-        for query_data in popular_queries:
-            if isinstance(query_data, tuple):
-                query, count = query_data
-                query = query.decode() if isinstance(query, bytes) else query
-                popular_list.append({"query": query, "count": int(count)})
+        vector_stats = {"status": "error", "error": "Service unavailable"}
+        embedding_stats = {"cache_size": 0, "openai_available": False, "local_model_available": False, "default_method": "none"}
         
-        # Get vector search stats
-        vector_stats = vector_search_service.get_vector_stats()
+        # Get various analytics from Redis with error handling
+        try:
+            if redis_client.client:
+                total_searches = int(redis_client.client.get("stats:total_searches") or 0)
+                cache_hits = int(redis_client.client.get("stats:cache_hits") or 0)
+                
+                # Get recent response times
+                response_times = redis_client.client.lrange("stats:response_times", 0, 99)
+                if response_times:
+                    times = [float(t) for t in response_times if t]
+                    avg_response_time = sum(times) / len(times) if times else 0
+                
+                # Get popular queries
+                popular_queries = redis_client.client.zrevrange("stats:popular_queries", 0, 9, withscores=True)
+                for query_data in popular_queries:
+                    if isinstance(query_data, tuple):
+                        query, count = query_data
+                        query = query.decode() if isinstance(query, bytes) else query
+                        popular_list.append({"query": query, "count": int(count)})
+        except Exception as redis_error:
+            logger.warning(f"Redis analytics error: {redis_error}")
         
-        # Get embedding stats
-        embedding_stats = embedding_service.get_embedding_stats()
+        # Get vector search stats with error handling
+        try:
+            vector_stats = vector_search_service.get_vector_stats()
+        except Exception as vector_error:
+            logger.warning(f"Vector stats error: {vector_error}")
+            vector_stats = {"status": "error", "error": str(vector_error)}
+        
+        # Get embedding stats with error handling
+        try:
+            embedding_stats = embedding_service.get_embedding_stats()
+        except Exception as embedding_error:
+            logger.warning(f"Embedding stats error: {embedding_error}")
+            embedding_stats = {"cache_size": 0, "openai_available": False, "local_model_available": False, "default_method": "error"}
         
         return {
             "search_stats": {
-                "total_searches": int(total_searches),
-                "cache_hits": int(cache_hits),
-                "cache_hit_rate": round(int(cache_hits) / max(int(total_searches), 1) * 100, 2),
+                "total_searches": total_searches,
+                "cache_hits": cache_hits,
+                "cache_hit_rate": round(cache_hits / max(total_searches, 1) * 100, 2),
                 "avg_response_time": round(avg_response_time, 3)
             },
             "popular_queries": popular_list,
@@ -226,7 +244,18 @@ async def get_search_analytics():
         
     except Exception as e:
         logger.error(f"Failed to get search analytics: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get analytics")
+        # Return fallback data instead of raising exception
+        return {
+            "search_stats": {
+                "total_searches": 0,
+                "cache_hits": 0,
+                "cache_hit_rate": 0,
+                "avg_response_time": 0
+            },
+            "popular_queries": [],
+            "vector_stats": {"status": "error", "error": "Service unavailable"},
+            "embedding_stats": {"cache_size": 0, "openai_available": False, "local_model_available": False, "default_method": "error"}
+        }
 
 @router.delete("/cache")
 async def clear_search_cache():
