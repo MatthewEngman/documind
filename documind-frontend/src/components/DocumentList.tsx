@@ -27,7 +27,13 @@ const DocumentList: React.FC<DocumentListProps> = ({ refreshTrigger, onDocumentS
   const { data: documentsData, isLoading, refetch } = useQuery({
     queryKey: ['documents', refreshTrigger],
     queryFn: () => documentApi.list(50, 0),
-    staleTime: 30000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    retry: 3,
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   const documents = documentsData?.documents || [];
