@@ -1,14 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Database, Zap, TrendingUp, Activity } from 'lucide-react';
-import DocumentUpload from './DocumentUpload';
 
-interface RedisShowcaseProps {
-  activeTab?: string;
-  onUploadSuccess?: () => void;
-}
-
-export const RedisShowcase: React.FC<RedisShowcaseProps> = ({ activeTab, onUploadSuccess }) => {
+export const RedisShowcase: React.FC = () => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -88,45 +82,24 @@ export const RedisShowcase: React.FC<RedisShowcaseProps> = ({ activeTab, onUploa
         </motion.div>
       </div>
       
-      {/* Show DocumentUpload when on upload tab - positioned above "Ready to Test" section */}
-      {activeTab === 'upload' && onUploadSuccess && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="mt-6"
-        >
-          <DocumentUpload onUploadSuccess={onUploadSuccess} />
-        </motion.div>
-      )}
-      
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
+        transition={{ delay: 0.7 }}
         className="mt-6 text-center"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200 max-w-2xl mx-auto"
+          className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200 max-w-2xl mx-auto"
         >
-          <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            📄 Ready to Test? Upload Your Documents!
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+            🚀 Experience Redis-Powered AI in Action
           </h3>
-          <p className="text-gray-600 mb-4">
-            Click the <strong>"Upload"</strong> button above to add your own documents and experience Redis-powered semantic search in action.
+          <p className="text-gray-600 text-sm">
+            Upload documents, search semantically, and explore analytics - all powered by Redis Vector Sets with 75% memory reduction.
           </p>
-          <div className="text-sm text-gray-500">
-            <p className="mb-2">💡 <strong>Suggested test documents:</strong></p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-left">
-              <p>• Research papers (PDF)</p>
-              <p>• Technical documentation (TXT, MD)</p>
-              <p>• Code files (PY, JS, etc.)</p>
-              <p>• Any text-based content for semantic search testing</p>
-            </div>
-          </div>
         </motion.div>
       </motion.div>
     </motion.div>
