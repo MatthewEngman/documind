@@ -109,7 +109,7 @@ const DocumentList: React.FC<DocumentListProps> = ({ refreshTrigger, onDocumentS
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-h-[600px] overflow-hidden flex flex-col">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">
           Documents ({documents.length})
@@ -133,7 +133,7 @@ const DocumentList: React.FC<DocumentListProps> = ({ refreshTrigger, onDocumentS
         )}
       </div>
 
-      <div className="grid gap-4">
+      <div className="flex-1 overflow-y-auto space-y-3 pr-2">
         <AnimatePresence>
           {documents.map((doc, index) => (
             <motion.div
