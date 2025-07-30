@@ -21,9 +21,15 @@ class Settings(BaseSettings):
         # Override port with environment variable for Cloud Run
         if "PORT" in os.environ:
             self.api_port = int(os.environ["PORT"])
+            print(f"🔧 Config: Using PORT from environment: {self.api_port}")
+        else:
+            print(f"🔧 Config: Using default port: {self.api_port}")
         # Override debug based on environment
         if os.getenv("ENVIRONMENT") == "production":
             self.debug = False
+            print(f"🔧 Config: Production mode - debug disabled")
+        else:
+            print(f"🔧 Config: Development mode - debug enabled")
     
     # OpenAI Configuration (optional)
     openai_api_key: Optional[str] = None

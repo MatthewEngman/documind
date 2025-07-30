@@ -271,6 +271,9 @@ async def test_endpoint():
 
 if __name__ == "__main__":
     import uvicorn
+    logger.info(f"🚀 Starting uvicorn server on {settings.api_host}:{settings.api_port}")
+    logger.info(f"🔧 Debug mode: {settings.debug}")
+    logger.info(f"🌍 Environment: {os.getenv('ENVIRONMENT', 'development')}")
     uvicorn.run(
         "app.main:app",
         host=settings.api_host,
