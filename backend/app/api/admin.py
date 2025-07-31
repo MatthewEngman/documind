@@ -112,3 +112,62 @@ async def debug_environment():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Environment debug failed: {str(e)}")
+
+@router.post("/test-openai")
+async def test_openai_initialization():
+    """Test OpenAI client initialization manually"""
+    import openai
+    import os
+    from app.config import settings
+    
+    try:
+        # Get the API key
+        api_key = settings.openai_api_key
+        if not api_key:
+            return {
+                "status": "failed",
+                "error": "No OpenAI API key found in settings",
+                "env_key_present": bool(os.getenv('OPENAI_API_KEY'))
+            }
+        
+        # Try to create OpenAI client
+        try:
+            client = openai.OpenAI(api_key=api_key)
+            
+            # Test the client
+            try:
+                models_response = client.models.list()
+                model_count = len(models_response.data)
+                
+                return {
+                    "status": "success",
+                    "client_created": True,
+                    "models_available": model_count,
+                    "api_key_length": len(api_key),
+                    "api_key_prefix": api_key[:10]
+                }
+                    
+            except Exception as api_error:
+                return {
+                    "status": "client_created_api_failed",
+                    "client_created": True,
+                    "api_test": "failed",
+                    "api_error": str(api_error),
+                    "api_key_length": len(api_key)
+                }
+                
+        except Exception as client_error:
+            return {
+                "status": "client_creation_failed",
+                "client_created": False,
+                "client_error": str(client_error),
+                "error_type": type(client_error).__name__,
+                "api_key_length": len(api_key)
+            }
+            
+    except Exception as e:
+        return {
+            "status": "unexpected_error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
