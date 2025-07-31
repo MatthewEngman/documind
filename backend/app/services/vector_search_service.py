@@ -1,6 +1,7 @@
 import redis
 import numpy as np
 import json
+import base64
 from typing import List, Dict, Optional, Any
 import logging
 import struct
@@ -104,22 +105,25 @@ class VectorSearchService:
                     # Prepare vector data for Redis
                     vector_key = f"vector:{chunk_id}"
                     
-                    # Serialize vector
-                    vector_bytes = self._serialize_vector(embedding["vector"])
-                    logger.info(f"Serialized vector: {len(vector_bytes)} bytes")
+                    # CRITICAL FIX: Store vector as base64 string instead of raw bytes
+                    vector_array = np.array(embedding["vector"], dtype=np.float32)
+                    vector_bytes = vector_array.tobytes()
+                    vector_base64 = base64.b64encode(vector_bytes).decode('ascii')
                     
-                    # Prepare document data
+                    logger.info(f"📦 Storing vector for {chunk_id}: {len(vector_bytes)} bytes -> base64")
+                    
+                    # Prepare document data with base64 encoded vector
                     vector_data = {
-                        "vector": vector_bytes,
-                        "content": chunk["text"][:1000],  # Truncate for storage efficiency
+                        "vector": vector_base64,  # Store as base64 string
+                        "content": chunk["text"][:1000],
                         "title": chunk.get("title", ""),
                         "filename": chunk.get("filename", ""),
                         "doc_id": doc_id,
                         "chunk_id": chunk_id,
                         "tags": "|".join(chunk.get("tags", [])),
-                        "word_count": chunk["word_count"],
-                        "chunk_index": chunk.get("chunk_index", 0),
-                        "upload_date": chunk.get("created_at", datetime.utcnow().isoformat()),
+                        "word_count": str(chunk["word_count"]),  # Store as string
+                        "chunk_index": str(chunk.get("chunk_index", 0)),  # Store as string
+                        "upload_date": chunk.get("upload_date", datetime.utcnow().isoformat()),
                         "embedding_method": embedding["method"],
                         "embedding_model": embedding["model"]
                     }
@@ -300,27 +304,19 @@ class VectorSearchService:
                     if not vector_data or "vector" not in vector_data:
                         continue
                     
-                    # Deserialize stored vector
-                    stored_vector_bytes = vector_data["vector"]
+                    # CRITICAL FIX: Properly decode base64 stored vector
+                    vector_base64 = vector_data["vector"]
                     
-                    # Handle different encoding formats
-                    if isinstance(stored_vector_bytes, str):
-                        try:
-                            # Try base64 decode first
-                            stored_vector_bytes = base64.b64decode(stored_vector_bytes)
-                        except:
-                            try:
-                                # Try direct string to bytes
-                                stored_vector_bytes = stored_vector_bytes.encode('latin-1')
-                            except:
-                                continue
-                    
-                    # Convert bytes to numpy array
-                    if len(stored_vector_bytes) != len(query_vector) * 4:
-                        logger.debug(f"Vector size mismatch for {key}: {len(stored_vector_bytes)} vs {len(query_vector) * 4}")
+                    try:
+                        # Decode from base64
+                        vector_bytes = base64.b64decode(vector_base64)
+                        stored_vector = np.frombuffer(vector_bytes, dtype=np.float32)
+                        
+                        logger.debug(f"✅ Decoded vector for {key}: {len(stored_vector)} dimensions")
+                        
+                    except Exception as decode_error:
+                        logger.warning(f"⚠️ Failed to decode vector for {key}: {decode_error}")
                         continue
-                    
-                    stored_vector = np.frombuffer(stored_vector_bytes, dtype=np.float32)
                     
                     # Calculate cosine similarity
                     similarity = self._calculate_cosine_similarity(query_vector, stored_vector)
@@ -328,9 +324,18 @@ class VectorSearchService:
                     if similarity >= 0.1:  # Lower threshold for demo
                         result = {
                             "id": key,
-                            "score": 1.0 - similarity,  # Convert similarity to distance
                             "similarity": similarity,
-                            **{k: v for k, v in vector_data.items() if k != "vector"}
+                            "score": 1.0 - similarity,
+                            "content": vector_data.get("content", ""),
+                            "title": vector_data.get("title", ""),
+                            "filename": vector_data.get("filename", ""),
+                            "doc_id": vector_data.get("doc_id", ""),
+                            "chunk_id": vector_data.get("chunk_id", ""),
+                            "tags": vector_data.get("tags", "").split("|") if vector_data.get("tags") else [],
+                            "word_count": int(vector_data.get("word_count", 0)),
+                            "chunk_index": int(vector_data.get("chunk_index", 0)),
+                            "upload_date": vector_data.get("upload_date", ""),
+                            "embedding_method": vector_data.get("embedding_method", ""),
                         }
                         results.append(result)
                     
