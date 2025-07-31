@@ -167,11 +167,16 @@ class VectorSearchService:
             
             # Try Redis Stack vector search first
             try:
-                results = await self._execute_redis_vector_search(query_vector, filters, limit)
-            except:
+                results = await self._execute_redis_stack_search(np.array(query_vector, dtype=np.float32), limit, filters)
+                if results:
+                    logger.info(f"Redis Stack search successful: {len(results)} results")
+                else:
+                    raise Exception("No results from Redis Stack search")
+            except Exception as e:
+                logger.error(f"Redis Stack vector search failed: {e}")
                 # Fallback to manual vector search
                 logger.info("Using fallback vector search")
-                results = await self._execute_fallback_vector_search(query_vector, filters, limit)
+                results = await self._execute_fallback_search(np.array(query_vector, dtype=np.float32), limit, filters)
             
             # Process and rank results
             processed_results = self._process_search_results(results, query_vector, similarity_threshold)
@@ -187,6 +192,21 @@ class VectorSearchService:
     async def _execute_redis_stack_search(self, query_vector: np.ndarray, limit: int, filters: Dict = None):
         """Execute Redis Stack vector search with correct query syntax"""
         try:
+            logger.info(f"🚀 STARTING Redis Stack search - method called successfully")
+            logger.info(f"📊 Input params: query_vector.shape={query_vector.shape}, limit={limit}")
+            
+            # Check Redis client availability
+            if not redis_client.client:
+                raise Exception("Redis client is None - connection not available")
+            logger.info(f"✅ Redis client available: {type(redis_client.client)}")
+            
+            # Check if vector index exists
+            try:
+                index_info = redis_client.client.ft(self.vector_index_name).info()
+                logger.info(f"✅ Vector index '{self.vector_index_name}' exists")
+            except Exception as index_error:
+                raise Exception(f"Vector index '{self.vector_index_name}' not found: {index_error}")
+            
             # Convert to bytes properly for Redis Stack
             query_blob = query_vector.tobytes()
             
