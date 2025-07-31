@@ -32,12 +32,20 @@ class EmbeddingService:
     def _initialize_providers(self):
         """Initialize embedding providers"""
         try:
+            # Debug: Log OpenAI API key status
+            api_key_status = "present" if settings.openai_api_key else "missing"
+            api_key_length = len(settings.openai_api_key) if settings.openai_api_key else 0
+            logger.info(f"🔍 OpenAI API key status: {api_key_status} (length: {api_key_length})")
+            
             # Initialize OpenAI if API key is available
             if settings.openai_api_key:
-                self.openai_client = openai.OpenAI(api_key=settings.openai_api_key)
-                logger.info("✅ OpenAI embedding service initialized")
+                try:
+                    self.openai_client = openai.OpenAI(api_key=settings.openai_api_key)
+                    logger.info("✅ OpenAI embedding service initialized successfully")
+                except Exception as openai_error:
+                    logger.error(f"❌ OpenAI client initialization failed: {openai_error}")
             else:
-                logger.info("⚠️ OpenAI API key not found, using local models only")
+                logger.warning("⚠️ OpenAI API key not found, using local models only")
             
             # Initialize local model as fallback
             if SENTENCE_TRANSFORMERS_AVAILABLE:

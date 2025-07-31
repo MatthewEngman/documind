@@ -55,3 +55,10 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Debug: Log configuration status
+import logging
+logger = logging.getLogger(__name__)
+logger.info(f"🔧 Configuration loaded - OpenAI API key: {'present' if settings.openai_api_key else 'missing'}")
+if settings.openai_api_key:
+    logger.info(f"🔧 OpenAI API key length: {len(settings.openai_api_key)}")
