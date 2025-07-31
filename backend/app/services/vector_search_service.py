@@ -283,6 +283,7 @@ class VectorSearchService:
         try:
             # Get all vector keys
             vector_keys = redis_client.client.keys("vector:*")
+            logger.info(f"🔍 Fallback search found {len(vector_keys)} vector keys")
             
             if not vector_keys:
                 logger.info("No vectors found for fallback search")
@@ -290,6 +291,8 @@ class VectorSearchService:
             
             results = []
             processed_count = 0
+            skipped_count = 0
+            decode_errors = 0
             
             for key in vector_keys:
                 try:
@@ -300,34 +303,43 @@ class VectorSearchService:
                     # Get vector data
                     vector_data = redis_client.client.hgetall(key)
                     if not vector_data or "vector" not in vector_data:
+                        logger.info(f"⚠️ Key {key} has no vector field, skipping")
+                        skipped_count += 1
                         continue
                     
-                    # CRITICAL FIX: Properly decode base64 stored vector
+                    # Decode stored vector with detailed logging
                     vector_base64 = vector_data["vector"]
+                    logger.info(f"🔍 Processing {key}: vector type={type(vector_base64)}, size={len(vector_base64) if hasattr(vector_base64, '__len__') else 'unknown'}")
                     
                     try:
                         # Try base64 decode first (new format)
                         if isinstance(vector_base64, str):
+                            logger.info(f"📝 Attempting base64 decode for {key}")
                             vector_bytes = base64.b64decode(vector_base64)
+                            logger.info(f"✅ Base64 decode successful: {len(vector_bytes)} bytes")
                         else:
                             # Handle old binary format gracefully
+                            logger.info(f"🔧 Using binary format for {key}")
                             vector_bytes = vector_base64
                         
                         stored_vector = np.frombuffer(vector_bytes, dtype=np.float32)
                         
                         # Validate vector dimensions
                         if len(stored_vector) != 1536:
-                            logger.debug(f"⚠️ Vector dimension mismatch for {key}: {len(stored_vector)}")
+                            logger.info(f"⚠️ Vector dimension mismatch for {key}: {len(stored_vector)} (expected 1536)")
+                            skipped_count += 1
                             continue
                         
-                        logger.debug(f"✅ Decoded vector for {key}: {len(stored_vector)} dimensions")
+                        logger.info(f"✅ Successfully decoded vector for {key}: {len(stored_vector)} dimensions")
                         
                     except Exception as decode_error:
-                        logger.debug(f"⚠️ Skipping broken vector {key}: {decode_error}")
+                        logger.info(f"❌ Failed to decode vector {key}: {decode_error}")
+                        decode_errors += 1
                         continue
                     
                     # Calculate cosine similarity
                     similarity = self._calculate_cosine_similarity(query_vector, stored_vector)
+                    logger.info(f"📊 Similarity for {key}: {similarity:.4f}")
                     
                     if similarity >= 0.1:  # Lower threshold for demo
                         result = {
@@ -346,11 +358,14 @@ class VectorSearchService:
                             "embedding_method": vector_data.get("embedding_method", ""),
                         }
                         results.append(result)
+                        logger.info(f"✅ Added result for {key} with similarity {similarity:.4f}")
+                    else:
+                        logger.info(f"⚠️ Similarity too low for {key}: {similarity:.4f} < 0.1")
                     
                     processed_count += 1
                     
                 except Exception as e:
-                    logger.debug(f"Error processing vector {key}: {e}")
+                    logger.info(f"❌ Error processing vector {key}: {e}")
                     continue
             
             logger.info(f"Processed {processed_count} vectors, found {len(results)} matches")
