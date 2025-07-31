@@ -174,17 +174,20 @@ class VectorSearchService:
     async def _execute_redis_vector_search(self, query_vector: List[float], filters: Optional[Dict], limit: int) -> List[Dict]:
         """Execute vector search against Redis Stack"""
         try:
+            # Import Query class
+            from redis.commands.search.query import Query
+            
             # Serialize query vector
             query_blob = self._serialize_vector(query_vector)
             
-            # Build FT.SEARCH query with vector similarity
-            vector_query = f"(*)=>[KNN {limit} @vector $vector]"
+            # Build FT.SEARCH query using Query object (per Python docs)
+            q = Query(f"*=>[KNN {limit} @vector $vector AS vector_score]").dialect(2)
             
             # Execute search
             if not redis_client.client:
                 raise Exception("Redis client not available")
             results = redis_client.client.ft(self.vector_index_name).search(
-                vector_query,
+                q,
                 query_params={"vector": query_blob}
             )
             
