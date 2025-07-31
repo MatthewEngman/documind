@@ -190,27 +190,24 @@ class VectorSearchService:
             # Import Query class
             from redis.commands.search.query import Query
             
-            # Serialize query vector
-            query_blob = self._serialize_vector(query_vector)
+            # Convert query vector to proper numpy format
+            query_vector_array = np.array(query_vector, dtype=np.float32)
+            query_blob = query_vector_array.tobytes()
+            
             logger.info(f"Query vector serialized: {len(query_blob)} bytes, type: {type(query_blob)}")
             logger.info(f"Query blob hex (first 20 chars): {query_blob.hex()[:20]}...")
             
-            # Build FT.SEARCH query using Query object (per Python docs)
-            q = Query(f"*=>[KNN {limit} @vector $vector AS vector_score]").dialect(2)
+            # Build the vector similarity query (simplified approach)
+            vector_query = f"*=>[KNN {limit} @vector $query_vector AS score]"
             
             # Execute search
             if not redis_client.client:
                 raise Exception("Redis client not available")
             
-            # Ensure query_blob is bytes and properly formatted
-            if not isinstance(query_blob, bytes):
-                logger.error(f"Query blob is not bytes: {type(query_blob)}")
-                raise Exception(f"Query vector must be bytes, got {type(query_blob)}")
-            
             logger.info(f"Executing Redis Stack search with {len(query_blob)} byte vector")
             results = redis_client.client.ft(self.vector_index_name).search(
-                q,
-                query_params={"vector": query_blob}
+                vector_query,
+                query_params={"query_vector": query_blob}
             )
             
             # Convert results to list of dicts
@@ -365,7 +362,18 @@ class VectorSearchService:
     def _serialize_vector(self, vector: List[float]) -> bytes:
         """Serialize vector for Redis storage (per Python redis-py docs)"""
         import numpy as np
-        return np.array(vector, dtype=np.float32).tobytes()
+        # Ensure vector is exactly the right format for Redis Stack
+        vector_array = np.array(vector, dtype=np.float32)
+        
+        # Validate dimensions
+        if len(vector_array) != settings.embedding_dimensions:
+            raise ValueError(f"Vector dimension mismatch: got {len(vector_array)}, expected {settings.embedding_dimensions}")
+        
+        # Convert to bytes in little-endian format (Redis Stack default)
+        vector_bytes = vector_array.astype('<f4').tobytes()
+        
+        logger.info(f"Serialized vector: {len(vector)} floats -> {len(vector_bytes)} bytes")
+        return vector_bytes
     
     def _deserialize_vector(self, vector_bytes: bytes) -> List[float]:
         """Deserialize vector from Redis (backward compatible)"""
