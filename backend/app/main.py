@@ -6,7 +6,7 @@ import os
 
 from app.config import settings
 from app.database.redis_client import redis_client
-from app.api import documents, search, admin
+from app.api import documents, search, admin, vector_admin
 from app.services.vector_search_service import vector_search_service
 
 # DocuMind Backend API
@@ -148,6 +148,7 @@ async def get_redis_stats():
 app.include_router(documents.router)
 app.include_router(search.router)
 app.include_router(admin.router)
+app.include_router(vector_admin.router)
 
 @app.post("/api/load-demo")
 async def load_demo_data():
