@@ -50,29 +50,27 @@ class EmbeddingService:
             # Initialize OpenAI if API key is available
             if settings.openai_api_key:
                 try:
-                    # Initialize OpenAI client with minimal configuration to avoid version issues
-                    self.openai_client = openai.OpenAI(
-                        api_key=settings.openai_api_key,
-                        timeout=30.0,  # Set reasonable timeout
-                        max_retries=3   # Set retry limit
-                    )
-                    logger.info("✅ OpenAI embedding service initialized successfully")
+                    # Use the most basic OpenAI client initialization to avoid version issues
+                    logger.info("🔧 Attempting basic OpenAI client initialization...")
+                    self.openai_client = openai.OpenAI(api_key=settings.openai_api_key)
+                    logger.info("✅ OpenAI client created successfully")
                     
                     # Test the client with a simple API call
                     try:
+                        logger.info("🧪 Testing OpenAI API connection...")
                         test_response = self.openai_client.models.list()
                         logger.info(f"✅ OpenAI API test successful - found {len(test_response.data)} models")
+                        logger.info("✅ OpenAI embedding service fully initialized and tested")
                     except Exception as test_error:
                         logger.error(f"❌ OpenAI API test failed: {test_error}")
-                        logger.error(f"❌ This suggests the API key may be invalid or there's a network issue")
+                        logger.error(f"❌ API key may be invalid or there's a network/permission issue")
+                        # Keep the client but mark it as potentially problematic
+                        logger.warning("⚠️ OpenAI client created but API test failed - will attempt embeddings anyway")
+                        
                 except Exception as openai_error:
                     logger.error(f"❌ OpenAI client initialization failed: {openai_error}")
-                    # Try fallback initialization without extra parameters
-                    try:
-                        self.openai_client = openai.OpenAI(api_key=settings.openai_api_key)
-                        logger.info("✅ OpenAI embedding service initialized with fallback method")
-                    except Exception as fallback_error:
-                        logger.error(f"❌ OpenAI fallback initialization also failed: {fallback_error}")
+                    logger.error(f"❌ Error type: {type(openai_error).__name__}")
+                    self.openai_client = None
             else:
                 logger.warning("⚠️ OpenAI API key not found, using local models only")
             
