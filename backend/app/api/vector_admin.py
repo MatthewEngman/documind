@@ -120,6 +120,29 @@ async def get_vector_index_info() -> Dict[str, Any]:
         logger.error(f"Failed to get vector index info: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get index info: {str(e)}")
 
+@router.post("/cleanup-broken-vectors")
+async def cleanup_broken_vectors():
+    """Clean up broken vectors that cause UTF-8 decode errors"""
+    try:
+        logger.info("Starting broken vector cleanup...")
+        
+        vector_service = VectorSearchService()
+        result = await vector_service.cleanup_broken_vectors()
+        
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        
+        return {
+            "message": "Broken vector cleanup completed",
+            "removed_vectors": result["removed"],
+            "kept_vectors": result["kept"],
+            "total_processed": result["removed"] + result["kept"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Vector cleanup failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Vector cleanup failed: {str(e)}")
+
 @router.post("/clear-all-data")
 async def clear_all_data() -> Dict[str, Any]:
     """
