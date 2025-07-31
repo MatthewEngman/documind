@@ -122,16 +122,9 @@ async def get_vector_index_info() -> Dict[str, Any]:
 
 @router.post("/cleanup-broken-vectors")
 async def cleanup_broken_vectors():
-    """Clean up broken vectors that cause UTF-8 decode errors"""
+    """Remove broken vectors that cause UTF-8 decode errors"""
     try:
-        logger.info("Starting broken vector cleanup...")
-        
-        vector_service = VectorSearchService()
-        result = await vector_service.cleanup_broken_vectors()
-        
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-        
+        result = await VectorSearchService().cleanup_broken_vectors()
         return {
             "message": "Broken vector cleanup completed",
             "removed_vectors": result["removed"],
@@ -142,6 +135,72 @@ async def cleanup_broken_vectors():
     except Exception as e:
         logger.error(f"Vector cleanup failed: {e}")
         raise HTTPException(status_code=500, detail=f"Vector cleanup failed: {str(e)}")
+
+@router.post("/regenerate-vectors")
+async def regenerate_vectors_for_existing_documents():
+    """Regenerate vectors for all existing documents that don't have vectors"""
+    try:
+        from app.services.document_processor import document_processor
+        
+        # Get all documents
+        documents = await document_processor.list_documents(limit=1000)
+        
+        if not documents:
+            return {
+                "message": "No documents found to regenerate vectors for",
+                "processed_documents": 0,
+                "vectors_generated": 0
+            }
+        
+        processed_count = 0
+        total_vectors = 0
+        errors = []
+        
+        for doc in documents:
+            try:
+                doc_id = doc["id"]
+                logger.info(f"Regenerating vectors for document {doc_id}: {doc['filename']}")
+                
+                # Get document chunks
+                chunks_data = redis_client.get_json(f"doc:chunks:{doc_id}")
+                if not chunks_data:
+                    logger.warning(f"No chunks found for document {doc_id}")
+                    continue
+                
+                # Get individual chunks
+                chunks = []
+                for chunk_id in chunks_data.get("chunks", []):
+                    chunk = redis_client.get_json(f"doc:chunk:{chunk_id}")
+                    if chunk:
+                        chunks.append(chunk)
+                
+                if not chunks:
+                    logger.warning(f"No valid chunks found for document {doc_id}")
+                    continue
+                
+                # Generate vectors for this document
+                vectors_added = await VectorSearchService().add_document_vectors(doc_id, chunks)
+                logger.info(f"Generated {vectors_added} vectors for document {doc_id}")
+                
+                processed_count += 1
+                total_vectors += vectors_added
+                
+            except Exception as doc_error:
+                error_msg = f"Failed to regenerate vectors for {doc.get('filename', 'unknown')}: {doc_error}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+        
+        return {
+            "message": "Vector regeneration completed",
+            "processed_documents": processed_count,
+            "vectors_generated": total_vectors,
+            "total_documents": len(documents),
+            "errors": errors[:5]  # Show first 5 errors
+        }
+        
+    except Exception as e:
+        logger.error(f"Vector regeneration error: {e}")
+        raise HTTPException(status_code=500, detail=f"Vector regeneration failed: {str(e)}")
 
 @router.post("/clear-all-data")
 async def clear_all_data() -> Dict[str, Any]:
