@@ -156,10 +156,10 @@ class VectorSearchService:
             raise
     
     async def search_vectors(self, 
-                           query: str, 
-                           limit: int = 10,
-                           filters: Optional[Dict] = None,
-                           similarity_threshold: float = 0.7) -> List[Dict]:
+                       query: str, 
+                       limit: int = 10,
+                       filters: Optional[Dict] = None,
+                       similarity_threshold: float = 0.1) -> List[Dict]:
         """Perform semantic vector search"""
         try:
             if not self.initialized:
