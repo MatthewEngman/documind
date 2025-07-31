@@ -191,11 +191,13 @@ class EmbeddingService:
     async def _generate_openai_embedding(self, text: str) -> Dict:
         """Generate OpenAI embedding"""
         try:
+            # Use the exact API format from OpenAI documentation
             response = await asyncio.to_thread(
                 self.openai_client.embeddings.create,
                 model=settings.embedding_model,
-                input=text,
-                dimensions=settings.embedding_dimensions
+                input=text
+                # Note: dimensions parameter removed - let OpenAI use default dimensions
+                # The text-embedding-3-small model has 1536 dimensions by default
             )
             
             return {
@@ -212,11 +214,12 @@ class EmbeddingService:
     async def _generate_openai_batch(self, texts: List[str]) -> List[Dict]:
         """Generate OpenAI embeddings in batch"""
         try:
+            # Use the exact API format from OpenAI documentation for batch processing
             response = await asyncio.to_thread(
                 self.openai_client.embeddings.create,
                 model=settings.embedding_model,
-                input=texts,
-                dimensions=settings.embedding_dimensions
+                input=texts
+                # Note: dimensions parameter removed - let OpenAI use default dimensions
             )
             
             results = []
