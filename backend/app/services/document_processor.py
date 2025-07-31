@@ -148,6 +148,10 @@ class DocumentProcessor:
                     chunks_data.append(chunk_data)
                 
                 # Generate and store vectors
+                logger.info(f"Passing {len(chunks_data)} chunks to vector service for {doc_id}")
+                for i, chunk in enumerate(chunks_data[:1]):  # Log first chunk structure
+                    logger.info(f"Chunk {i} keys: {list(chunk.keys())}")
+                    logger.info(f"Chunk {i} chunk_id: {chunk.get('chunk_id', 'MISSING')}")
                 vectors_added = await vector_search_service.add_document_vectors(doc_id, chunks_data)
                 document["vectors_generated"] = vectors_added
                 
