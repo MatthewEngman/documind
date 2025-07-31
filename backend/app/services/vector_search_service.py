@@ -178,7 +178,7 @@ class VectorSearchService:
             query_blob = self._serialize_vector(query_vector)
             
             # Build FT.SEARCH query with vector similarity
-            vector_query = f"*=>[KNN {limit} @vector $query_vector]"
+            vector_query = f"(*)=>[KNN {limit} @vector $query_vector]"
             
             # Execute search
             if not redis_client.client:
