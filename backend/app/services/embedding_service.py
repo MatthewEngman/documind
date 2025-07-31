@@ -32,10 +32,20 @@ class EmbeddingService:
     def _initialize_providers(self):
         """Initialize embedding providers"""
         try:
-            # Debug: Log OpenAI API key status
-            api_key_status = "present" if settings.openai_api_key else "missing"
-            api_key_length = len(settings.openai_api_key) if settings.openai_api_key else 0
-            logger.info(f"🔍 OpenAI API key status: {api_key_status} (length: {api_key_length})")
+            # Debug: Log OpenAI API key status with more details
+            import os
+            env_openai_key = os.getenv('OPENAI_API_KEY')
+            settings_openai_key = settings.openai_api_key
+            
+            logger.info(f"🔍 Environment OPENAI_API_KEY: {'present' if env_openai_key else 'missing'} (length: {len(env_openai_key) if env_openai_key else 0})")
+            logger.info(f"🔍 Settings openai_api_key: {'present' if settings_openai_key else 'missing'} (length: {len(settings_openai_key) if settings_openai_key else 0})")
+            
+            if env_openai_key and settings_openai_key:
+                logger.info(f"🔍 Keys match: {env_openai_key[:10] == settings_openai_key[:10]}")
+            
+            # Log first few characters for debugging (safe)
+            if settings_openai_key:
+                logger.info(f"🔍 OpenAI key starts with: {settings_openai_key[:10]}...")
             
             # Initialize OpenAI if API key is available
             if settings.openai_api_key:
@@ -47,6 +57,14 @@ class EmbeddingService:
                         max_retries=3   # Set retry limit
                     )
                     logger.info("✅ OpenAI embedding service initialized successfully")
+                    
+                    # Test the client with a simple API call
+                    try:
+                        test_response = self.openai_client.models.list()
+                        logger.info(f"✅ OpenAI API test successful - found {len(test_response.data)} models")
+                    except Exception as test_error:
+                        logger.error(f"❌ OpenAI API test failed: {test_error}")
+                        logger.error(f"❌ This suggests the API key may be invalid or there's a network issue")
                 except Exception as openai_error:
                     logger.error(f"❌ OpenAI client initialization failed: {openai_error}")
                     # Try fallback initialization without extra parameters
