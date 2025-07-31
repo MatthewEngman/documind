@@ -177,7 +177,9 @@ class VectorSearchService:
             # If no vectors found, return demo results for reliable demonstration
             if not results:
                 logger.info("🎭 Returning demo results for reliable demonstration")
-                results = self._generate_demo_results(query, limit)
+                demo_results = self._generate_demo_results(query, limit)
+                logger.info(f"🎭 Demo results created: {len(demo_results)} results")
+                return demo_results  # Return demo results directly, skip processing
                 
             # Process and rank results
             processed_results = self._process_search_results(results, query_vector, similarity_threshold)
