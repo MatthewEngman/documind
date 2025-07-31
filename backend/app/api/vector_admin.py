@@ -120,6 +120,110 @@ async def get_vector_index_info() -> Dict[str, Any]:
         logger.error(f"Failed to get vector index info: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get index info: {str(e)}")
 
+@router.post("/clear-all-data")
+async def clear_all_data() -> Dict[str, Any]:
+    """
+    Clear ALL documents, vectors, and related data for a complete fresh start
+    WARNING: This will delete everything - documents, vectors, analytics, etc.
+    """
+    try:
+        if not redis_client.client:
+            raise HTTPException(status_code=500, detail="Redis client not available")
+        
+        vector_service = VectorSearchService()
+        index_name = vector_service.vector_index_name
+        
+        deleted_counts = {
+            "documents": 0,
+            "vectors": 0,
+            "chunks": 0,
+            "analytics": 0,
+            "other_keys": 0
+        }
+        
+        # Step 1: Drop vector index
+        try:
+            redis_client.client.ft(index_name).dropindex(delete_documents=True)
+            logger.info(f"Dropped vector index: {index_name}")
+            index_dropped = True
+        except Exception as e:
+            logger.info(f"No vector index to drop: {e}")
+            index_dropped = False
+        
+        # Step 2: Delete all document keys (doc:*)
+        doc_keys = []
+        for key in redis_client.client.scan_iter(match="doc:*"):
+            doc_keys.append(key.decode() if isinstance(key, bytes) else key)
+        if doc_keys:
+            redis_client.client.delete(*doc_keys)
+            deleted_counts["documents"] = len(doc_keys)
+            logger.info(f"Deleted {len(doc_keys)} document keys")
+        
+        # Step 3: Delete all vector keys (vector:*)
+        vector_keys = []
+        for key in redis_client.client.scan_iter(match="vector:*"):
+            vector_keys.append(key.decode() if isinstance(key, bytes) else key)
+        if vector_keys:
+            redis_client.client.delete(*vector_keys)
+            deleted_counts["vectors"] = len(vector_keys)
+            logger.info(f"Deleted {len(vector_keys)} vector keys")
+        
+        # Step 4: Delete all chunk keys (chunk:*)
+        chunk_keys = []
+        for key in redis_client.client.scan_iter(match="chunk:*"):
+            chunk_keys.append(key.decode() if isinstance(key, bytes) else key)
+        if chunk_keys:
+            redis_client.client.delete(*chunk_keys)
+            deleted_counts["chunks"] = len(chunk_keys)
+            logger.info(f"Deleted {len(chunk_keys)} chunk keys")
+        
+        # Step 5: Delete analytics/stats keys
+        stats_keys = []
+        for pattern in ["stats:*", "analytics:*", "cache:*"]:
+            for key in redis_client.client.scan_iter(match=pattern):
+                stats_keys.append(key.decode() if isinstance(key, bytes) else key)
+        if stats_keys:
+            redis_client.client.delete(*stats_keys)
+            deleted_counts["analytics"] = len(stats_keys)
+            logger.info(f"Deleted {len(stats_keys)} analytics keys")
+        
+        # Step 6: Delete document index set
+        try:
+            redis_client.client.delete("doc:index")
+            logger.info("Deleted document index set")
+        except Exception as e:
+            logger.info(f"No document index to delete: {e}")
+        
+        # Step 7: Recreate clean vector index
+        await vector_service.initialize_vector_index()
+        logger.info(f"Recreated clean vector index: {index_name}")
+        
+        # Step 8: Verify clean state
+        try:
+            index_info = redis_client.client.ft(index_name).info()
+            new_index_created = True
+            num_docs = index_info.get('num_docs', 0)
+        except Exception:
+            new_index_created = False
+            num_docs = -1
+        
+        return {
+            "success": True,
+            "message": "All data cleared successfully - complete fresh start",
+            "details": {
+                "index_dropped": index_dropped,
+                "new_index_created": new_index_created,
+                "index_name": index_name,
+                "deleted_counts": deleted_counts,
+                "total_deleted": sum(deleted_counts.values()),
+                "final_index_docs": num_docs
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to clear all data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear data: {str(e)}")
+
 @router.post("/test-vector-serialization")
 async def test_vector_serialization() -> Dict[str, Any]:
     """Test vector serialization methods to debug UTF-8 issues"""

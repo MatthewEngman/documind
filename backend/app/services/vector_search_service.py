@@ -96,11 +96,17 @@ class VectorSearchService:
             
             for chunk, embedding in zip(chunks_data, embeddings):
                 try:
+                    # Debug: Log chunk structure
+                    chunk_id = chunk.get('chunk_id', 'MISSING_CHUNK_ID')
+                    logger.info(f"Processing chunk with ID: {chunk_id}")
+                    logger.info(f"Chunk keys: {list(chunk.keys())}")
+                    
                     # Prepare vector data for Redis
                     vector_key = f"vector:{chunk['chunk_id']}"
                     
                     # Serialize vector
                     vector_bytes = self._serialize_vector(embedding["vector"])
+                    logger.info(f"Serialized vector: {len(vector_bytes)} bytes")
                     
                     # Prepare document data
                     vector_data = {
@@ -118,13 +124,20 @@ class VectorSearchService:
                         "embedding_model": embedding["model"]
                     }
                     
+                    logger.info(f"Prepared vector data for chunk {chunk_id}")
+                    
                     # Store in Redis
                     if redis_client.client:
                         redis_client.client.hset(vector_key, mapping=vector_data)
                         vectors_added += 1
+                        logger.info(f"Successfully stored vector for chunk {chunk_id}")
                     
                 except Exception as e:
-                    logger.error(f"Failed to add vector for chunk {chunk['chunk_id']}: {e}")
+                    chunk_id_safe = chunk.get('chunk_id', 'UNKNOWN') if isinstance(chunk, dict) else 'NOT_DICT'
+                    logger.error(f"Failed to add vector for chunk {chunk_id_safe}: {e}")
+                    logger.error(f"Chunk type: {type(chunk)}, Embedding type: {type(embedding)}")
+                    import traceback
+                    logger.error(f"Full traceback: {traceback.format_exc()}")
             
             logger.info(f"Added {vectors_added}/{len(chunks_data)} vectors for document {doc_id}")
             
