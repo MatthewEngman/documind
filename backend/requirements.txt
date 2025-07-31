@@ -8,6 +8,8 @@ python-magic==0.4.27
 python-dotenv==1.0.0
 pydantic-settings==2.1.0
 sentence-transformers==2.2.2
+torch==2.0.1
+torchvision==0.15.2
 langdetect==1.0.9
 nltk==3.8.1
 aiofiles==23.2.0

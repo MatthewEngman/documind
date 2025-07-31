@@ -40,22 +40,38 @@ class EmbeddingService:
             # Initialize OpenAI if API key is available
             if settings.openai_api_key:
                 try:
-                    self.openai_client = openai.OpenAI(api_key=settings.openai_api_key)
+                    # Initialize OpenAI client with minimal configuration to avoid version issues
+                    self.openai_client = openai.OpenAI(
+                        api_key=settings.openai_api_key,
+                        timeout=30.0,  # Set reasonable timeout
+                        max_retries=3   # Set retry limit
+                    )
                     logger.info("✅ OpenAI embedding service initialized successfully")
                 except Exception as openai_error:
                     logger.error(f"❌ OpenAI client initialization failed: {openai_error}")
+                    # Try fallback initialization without extra parameters
+                    try:
+                        self.openai_client = openai.OpenAI(api_key=settings.openai_api_key)
+                        logger.info("✅ OpenAI embedding service initialized with fallback method")
+                    except Exception as fallback_error:
+                        logger.error(f"❌ OpenAI fallback initialization also failed: {fallback_error}")
             else:
                 logger.warning("⚠️ OpenAI API key not found, using local models only")
             
             # Initialize local model as fallback
             if SENTENCE_TRANSFORMERS_AVAILABLE:
                 try:
+                    # Try to load the local model with better error handling
+                    logger.info("💾 Attempting to load sentence-transformers model...")
                     self.local_model = SentenceTransformer('all-MiniLM-L6-v2')
-                    logger.info("✅ Local embedding model loaded (all-MiniLM-L6-v2)")
+                    logger.info("✅ Local embedding model loaded successfully (all-MiniLM-L6-v2)")
                 except Exception as e:
-                    logger.warning(f"Local model initialization failed: {e}")
+                    logger.error(f"❌ Local model initialization failed: {e}")
+                    logger.error(f"❌ Error type: {type(e).__name__}")
+                    self.local_model = None
             else:
-                logger.warning("sentence-transformers not available, install for local embeddings")
+                logger.error("❌ sentence-transformers package not available - check Docker installation")
+                logger.info("📝 To fix: ensure sentence-transformers is properly installed in production environment")
                 
         except Exception as e:
             logger.error(f"Embedding service initialization failed: {e}")
