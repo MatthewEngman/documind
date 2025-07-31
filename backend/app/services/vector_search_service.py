@@ -192,6 +192,8 @@ class VectorSearchService:
             
             # Serialize query vector
             query_blob = self._serialize_vector(query_vector)
+            logger.info(f"Query vector serialized: {len(query_blob)} bytes, type: {type(query_blob)}")
+            logger.info(f"Query blob hex (first 20 chars): {query_blob.hex()[:20]}...")
             
             # Build FT.SEARCH query using Query object (per Python docs)
             q = Query(f"*=>[KNN {limit} @vector $vector AS vector_score]").dialect(2)
@@ -199,6 +201,13 @@ class VectorSearchService:
             # Execute search
             if not redis_client.client:
                 raise Exception("Redis client not available")
+            
+            # Ensure query_blob is bytes and properly formatted
+            if not isinstance(query_blob, bytes):
+                logger.error(f"Query blob is not bytes: {type(query_blob)}")
+                raise Exception(f"Query vector must be bytes, got {type(query_blob)}")
+            
+            logger.info(f"Executing Redis Stack search with {len(query_blob)} byte vector")
             results = redis_client.client.ft(self.vector_index_name).search(
                 q,
                 query_params={"vector": query_blob}
