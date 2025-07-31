@@ -97,12 +97,12 @@ class VectorSearchService:
             for chunk, embedding in zip(chunks_data, embeddings):
                 try:
                     # Debug: Log chunk structure
-                    chunk_id = chunk.get('chunk_id', 'MISSING_CHUNK_ID')
+                    chunk_id = chunk.get('id', chunk.get('chunk_id', 'MISSING_CHUNK_ID'))
                     logger.info(f"Processing chunk with ID: {chunk_id}")
                     logger.info(f"Chunk keys: {list(chunk.keys())}")
                     
                     # Prepare vector data for Redis
-                    vector_key = f"vector:{chunk['chunk_id']}"
+                    vector_key = f"vector:{chunk_id}"
                     
                     # Serialize vector
                     vector_bytes = self._serialize_vector(embedding["vector"])
@@ -115,11 +115,11 @@ class VectorSearchService:
                         "title": chunk.get("title", ""),
                         "filename": chunk.get("filename", ""),
                         "doc_id": doc_id,
-                        "chunk_id": chunk["chunk_id"],
+                        "chunk_id": chunk_id,
                         "tags": "|".join(chunk.get("tags", [])),
                         "word_count": chunk["word_count"],
                         "chunk_index": chunk.get("chunk_index", 0),
-                        "upload_date": chunk.get("upload_date", datetime.utcnow().isoformat()),
+                        "upload_date": chunk.get("created_at", datetime.utcnow().isoformat()),
                         "embedding_method": embedding["method"],
                         "embedding_model": embedding["model"]
                     }
