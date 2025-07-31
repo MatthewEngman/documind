@@ -178,14 +178,14 @@ class VectorSearchService:
             query_blob = self._serialize_vector(query_vector)
             
             # Build FT.SEARCH query with vector similarity
-            vector_query = f"(*)=>[KNN {limit} @vector $query_vector]"
+            vector_query = f"(*)=>[KNN {limit} @vector $vector]"
             
             # Execute search
             if not redis_client.client:
                 raise Exception("Redis client not available")
             results = redis_client.client.ft(self.vector_index_name).search(
                 vector_query,
-                query_params={"query_vector": query_blob}
+                query_params={"vector": query_blob}
             )
             
             # Convert results to list of dicts
