@@ -88,18 +88,34 @@ class EmbeddingService:
                 logger.debug("Cache hit for embedding")
                 return self.embedding_cache[cache_key]
             
-            # Generate embedding based on method
+            # Generate embedding based on method with proper availability checking
             if method == "auto":
-                method = "openai" if self.openai_client else "local"
+                if self.openai_client:
+                    method = "openai"
+                    logger.debug("🤖 Auto-selected OpenAI embedding method")
+                elif self.local_model:
+                    method = "local"
+                    logger.debug("💻 Auto-selected local embedding method")
+                else:
+                    available_methods = []
+                    if self.openai_client:
+                        available_methods.append("openai")
+                    if self.local_model:
+                        available_methods.append("local")
+                    raise ValueError(f"No embedding methods available. OpenAI client: {self.openai_client is not None}, Local model: {self.local_model is not None}. Available: {available_methods}")
             
             start_time = time.time()
             
-            if method == "openai" and self.openai_client:
+            if method == "openai":
+                if not self.openai_client:
+                    raise ValueError(f"OpenAI embedding method requested but OpenAI client not available")
                 result = await self._generate_openai_embedding(clean_text)
-            elif method == "local" and self.local_model:
+            elif method == "local":
+                if not self.local_model:
+                    raise ValueError(f"Local embedding method requested but local model not available")
                 result = await self._generate_local_embedding(clean_text)
             else:
-                raise ValueError(f"Embedding method '{method}' not available")
+                raise ValueError(f"Unknown embedding method '{method}'. Available methods: openai, local")
             
             generation_time = time.time() - start_time
             
@@ -289,11 +305,19 @@ class EmbeddingService:
     
     def get_embedding_stats(self) -> Dict:
         """Get embedding service statistics"""
+        # Determine default method based on availability
+        if self.openai_client:
+            default_method = "openai"
+        elif self.local_model:
+            default_method = "local"
+        else:
+            default_method = "none_available"
+            
         return {
             "cache_size": len(self.embedding_cache),
             "openai_available": self.openai_client is not None,
             "local_model_available": self.local_model is not None,
-            "default_method": "openai" if self.openai_client else "local"
+            "default_method": default_method
         }
     
     def clear_cache(self):
