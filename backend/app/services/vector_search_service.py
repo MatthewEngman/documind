@@ -594,6 +594,26 @@ class VectorSearchService:
             logger.error(f"Cleanup failed: {e}")
             return {"error": str(e)}
     
+    def _calculate_cosine_similarity(self, vector1: np.ndarray, vector2: np.ndarray) -> float:
+        """Calculate cosine similarity between two vectors"""
+        try:
+            # Normalize vectors
+            norm1 = np.linalg.norm(vector1)
+            norm2 = np.linalg.norm(vector2)
+            
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+            
+            # Calculate cosine similarity
+            similarity = np.dot(vector1, vector2) / (norm1 * norm2)
+            
+            # Ensure result is between 0 and 1
+            return max(0.0, min(1.0, float(similarity)))
+            
+        except Exception as e:
+            logger.error(f"Error calculating cosine similarity: {e}")
+            return 0.0
+    
     def _generate_demo_results(self, query: str, limit: int = 3) -> List[Dict]:
         """Generate demo results when search fails"""
         import random
