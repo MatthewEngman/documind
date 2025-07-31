@@ -184,96 +184,146 @@ class VectorSearchService:
             logger.error(f"Vector search failed: {e}")
             return []
     
-    async def _execute_redis_vector_search(self, query_vector: List[float], filters: Optional[Dict], limit: int) -> List[Dict]:
-        """Execute vector search against Redis Stack"""
+    async def _execute_redis_stack_search(self, query_vector: np.ndarray, limit: int, filters: Dict = None):
+        """Execute Redis Stack vector search with correct query syntax"""
         try:
-            # Import Query class
-            from redis.commands.search.query import Query
-            
-            # Convert query vector to proper numpy format
-            query_vector_array = np.array(query_vector, dtype=np.float32)
-            query_blob = query_vector_array.tobytes()
+            # Convert to bytes properly for Redis Stack
+            query_blob = query_vector.tobytes()
             
             logger.info(f"Query vector serialized: {len(query_blob)} bytes, type: {type(query_blob)}")
             logger.info(f"Query blob hex (first 20 chars): {query_blob.hex()[:20]}...")
-            
-            # Build the vector similarity query (simplified approach)
-            vector_query = f"*=>[KNN {limit} @vector $query_vector AS score]"
-            
-            # Execute search
-            if not redis_client.client:
-                raise Exception("Redis client not available")
-            
             logger.info(f"Executing Redis Stack search with {len(query_blob)} byte vector")
-            results = redis_client.client.ft(self.vector_index_name).search(
-                vector_query,
-                query_params={"query_vector": query_blob}
-            )
             
-            # Convert results to list of dicts
-            search_results = []
-            for doc in results.docs:
-                result = {
-                    "id": doc.id,
-                    "score": float(doc.score) if hasattr(doc, 'score') else 0.0,
-                    **{k: v for k, v in doc.__dict__.items() if not k.startswith('_')}
-                }
-                search_results.append(result)
+            # Try different Redis Stack query syntaxes
+            query_syntaxes = [
+                # Syntax 1: Standard KNN query
+                f"*=>[KNN {limit} @vector $query_vector AS score]",
+                
+                # Syntax 2: Alternative format
+                f"*=>[KNN {limit} @vector $query_vector]",
+                
+                # Syntax 3: Simplified format
+                f"*=>[KNN {limit} @vector $blob AS distance]",
+                
+                # Syntax 4: With parentheses
+                f"(*)=>[KNN {limit} @vector $query_vector AS score]",
+                
+                # Syntax 5: Different parameter name
+                f"*=>[KNN {limit} @vector $vec AS score]"
+            ]
             
-            return search_results
+            for i, vector_query in enumerate(query_syntaxes):
+                try:
+                    logger.info(f"Trying query syntax {i+1}: {vector_query}")
+                    
+                    # Execute search with proper query parameters
+                    results = redis_client.client.ft(self.vector_index_name).search(
+                        vector_query,
+                        query_params={
+                            "query_vector": query_blob, 
+                            "blob": query_blob,
+                            "vec": query_blob
+                        }
+                    )
+                    
+                    logger.info(f"✅ Query syntax {i+1} successful! Found {len(results.docs)} results")
+                    
+                    # Convert results to list of dicts
+                    search_results = []
+                    for doc in results.docs:
+                        result = {
+                            "id": doc.id,
+                            "score": float(doc.score) if hasattr(doc, 'score') else 0.0
+                        }
+                        # Add all document fields
+                        for key, value in doc.__dict__.items():
+                            if not key.startswith('_'):
+                                result[key] = value
+                        
+                        search_results.append(result)
+                    
+                    return search_results
+                    
+                except Exception as syntax_error:
+                    logger.warning(f"Query syntax {i+1} failed: {syntax_error}")
+                    continue
+            
+            # If all syntaxes fail, raise the last error
+            raise Exception("All Redis Stack query syntaxes failed")
             
         except Exception as e:
-            logger.error(f"Redis Stack vector search failed: {e}")
+            logger.error(f"Redis Stack vector search execution failed: {e}")
             raise
     
-    async def _execute_fallback_vector_search(self, query_vector: List[float], filters: Optional[Dict], limit: int) -> List[Dict]:
-        """Fallback vector search using manual similarity calculation"""
+    async def _execute_fallback_search(self, query_vector: np.ndarray, limit: int, filters: Dict = None):
+        """Enhanced fallback vector search with better error handling"""
         try:
             # Get all vector keys
-            if not redis_client.client:
-                return []
             vector_keys = redis_client.client.keys("vector:*")
             
-            similarities = []
+            if not vector_keys:
+                logger.info("No vectors found for fallback search")
+                return []
+            
+            results = []
+            processed_count = 0
             
             for key in vector_keys:
                 try:
-                    if not redis_client.client:
-                        continue
+                    # Limit processing for performance
+                    if processed_count >= 100:
+                        break
+                    
+                    # Get vector data
                     vector_data = redis_client.client.hgetall(key)
-                    if not vector_data:
+                    if not vector_data or "vector" not in vector_data:
                         continue
                     
-                    # Deserialize vector
-                    if b'vector' in vector_data:
-                        doc_vector = self._deserialize_vector(vector_data[b'vector'])
-                    elif 'vector' in vector_data:
-                        doc_vector = self._deserialize_vector(vector_data['vector'])
-                    else:
+                    # Deserialize stored vector
+                    stored_vector_bytes = vector_data["vector"]
+                    
+                    # Handle different encoding formats
+                    if isinstance(stored_vector_bytes, str):
+                        try:
+                            # Try base64 decode first
+                            stored_vector_bytes = base64.b64decode(stored_vector_bytes)
+                        except:
+                            try:
+                                # Try direct string to bytes
+                                stored_vector_bytes = stored_vector_bytes.encode('latin-1')
+                            except:
+                                continue
+                    
+                    # Convert bytes to numpy array
+                    if len(stored_vector_bytes) != len(query_vector) * 4:
+                        logger.debug(f"Vector size mismatch for {key}: {len(stored_vector_bytes)} vs {len(query_vector) * 4}")
                         continue
                     
-                    # Calculate similarity
-                    similarity = embedding_service.calculate_similarity(query_vector, doc_vector)
+                    stored_vector = np.frombuffer(stored_vector_bytes, dtype=np.float32)
                     
-                    # Convert bytes to strings for processing
-                    processed_data = {}
-                    for k, v in vector_data.items():
-                        key_str = k.decode() if isinstance(k, bytes) else k
-                        val_str = v.decode() if isinstance(v, bytes) else v
-                        processed_data[key_str] = val_str
+                    # Calculate cosine similarity
+                    similarity = self._calculate_cosine_similarity(query_vector, stored_vector)
                     
-                    processed_data['similarity'] = similarity
-                    processed_data['id'] = key.decode() if isinstance(key, bytes) else key
+                    if similarity >= 0.1:  # Lower threshold for demo
+                        result = {
+                            "id": key,
+                            "score": 1.0 - similarity,  # Convert similarity to distance
+                            "similarity": similarity,
+                            **{k: v for k, v in vector_data.items() if k != "vector"}
+                        }
+                        results.append(result)
                     
-                    similarities.append(processed_data)
+                    processed_count += 1
                     
                 except Exception as e:
                     logger.debug(f"Error processing vector {key}: {e}")
                     continue
             
-            # Sort by similarity and return top results
-            similarities.sort(key=lambda x: x.get('similarity', 0), reverse=True)
-            return similarities[:limit]
+            logger.info(f"Processed {processed_count} vectors, found {len(results)} matches")
+            
+            # Sort by similarity (descending)
+            results.sort(key=lambda x: x.get("similarity", 0), reverse=True)
+            return results[:limit]
             
         except Exception as e:
             logger.error(f"Fallback vector search failed: {e}")
