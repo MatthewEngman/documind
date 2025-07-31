@@ -185,7 +185,8 @@ class VectorSearchService:
                 raise Exception("Redis client not available")
             results = redis_client.client.ft(self.vector_index_name).search(
                 vector_query,
-                query_params={"query_vector": query_blob}
+                query_params={"query_vector": query_blob},
+                dialect=2
             )
             
             # Convert results to list of dicts
