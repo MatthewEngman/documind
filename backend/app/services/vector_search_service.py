@@ -341,12 +341,14 @@ class VectorSearchService:
             return False
     
     def _serialize_vector(self, vector: List[float]) -> bytes:
-        """Serialize vector for Redis storage"""
-        return struct.pack(f'{len(vector)}f', *vector)
+        """Serialize vector for Redis storage (per Python redis-py docs)"""
+        import numpy as np
+        return np.array(vector, dtype=np.float32).tobytes()
     
     def _deserialize_vector(self, vector_bytes: bytes) -> List[float]:
-        """Deserialize vector from Redis"""
-        return list(struct.unpack(f'{len(vector_bytes)//4}f', vector_bytes))
+        """Deserialize vector from Redis (per Python redis-py docs)"""
+        import numpy as np
+        return np.frombuffer(vector_bytes, dtype=np.float32).tolist()
     
     def get_vector_stats(self) -> Dict:
         """Get vector search statistics"""
