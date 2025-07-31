@@ -346,9 +346,21 @@ class VectorSearchService:
         return np.array(vector, dtype=np.float32).tobytes()
     
     def _deserialize_vector(self, vector_bytes: bytes) -> List[float]:
-        """Deserialize vector from Redis (per Python redis-py docs)"""
+        """Deserialize vector from Redis (backward compatible)"""
         import numpy as np
-        return np.frombuffer(vector_bytes, dtype=np.float32).tolist()
+        import struct
+        
+        try:
+            # Try new numpy format first
+            return np.frombuffer(vector_bytes, dtype=np.float32).tolist()
+        except Exception:
+            try:
+                # Fallback to old struct format for backward compatibility
+                num_floats = len(vector_bytes) // 4
+                return list(struct.unpack(f'{num_floats}f', vector_bytes))
+            except Exception as e:
+                logger.error(f"Failed to deserialize vector: {e}")
+                raise
     
     def get_vector_stats(self) -> Dict:
         """Get vector search statistics"""
