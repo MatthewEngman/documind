@@ -70,7 +70,7 @@ jobs:
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars="REDIS_HOST=${{ secrets.REDIS_HOST }},REDIS_PORT=${{ secrets.REDIS_PORT }},REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }},REDIS_REQUIRED=false,ENVIRONMENT=production,FRONTEND_URL=https://documind-ruby.vercel.app,CORS_ALLOW_ALL=true" \
+          --set-env-vars="REDIS_HOST=${{ secrets.REDIS_HOST }},REDIS_PORT=${{ secrets.REDIS_PORT }},REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }},REDIS_SSL=true,REDIS_REQUIRED=true,ENVIRONMENT=production,FRONTEND_URL=https://documind-ruby.vercel.app,CORS_ALLOW_ALL=true" \
           --memory=1Gi \
           --cpu=1 \
           --max-instances=10 \
