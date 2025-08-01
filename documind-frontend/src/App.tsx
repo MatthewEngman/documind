@@ -6,6 +6,7 @@ import SearchInterface from './components/SearchInterface';
 import DocumentList from './components/DocumentList';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import DocumentUpload from './components/DocumentUpload';
+import DocumentDetailsModal from './components/DocumentDetailsModal';
 import { RedisShowcase } from './components/RedisShowcase';
 import { PerformanceMetrics } from './components/PerformanceMetrics';
 import { RedisChallenge } from './components/RedisChallenge';
@@ -26,6 +27,7 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+  const [showDocumentDetails, setShowDocumentDetails] = useState(false);
 
   const handleUploadSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -33,7 +35,13 @@ function App() {
 
   const handleDocumentSelect = (doc: Document) => {
     setSelectedDocument(doc);
+    setShowDocumentDetails(true);
     console.log('Selected document:', doc);
+  };
+
+  const handleCloseDocumentDetails = () => {
+    setShowDocumentDetails(false);
+    setSelectedDocument(null);
   };
 
   const handleSearchResultClick = (result: SearchResult) => {
@@ -111,6 +119,13 @@ function App() {
             </div>
           </div>
         </DashboardLayout>
+        
+        {/* Document Details Modal */}
+        <DocumentDetailsModal
+          document={selectedDocument}
+          isOpen={showDocumentDetails}
+          onClose={handleCloseDocumentDetails}
+        />
         
         {/* Toast notifications */}
         <Toaster
