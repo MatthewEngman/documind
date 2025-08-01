@@ -8,6 +8,7 @@ from app.config import settings
 from app.database.redis_client import redis_client
 from app.api import documents, search, admin, vector_admin
 from app.services.vector_search_service import vector_search_service
+from app.services.embedding_service import embedding_service
 
 # DocuMind Backend API
 # FastAPI application for document processing and semantic search

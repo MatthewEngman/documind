@@ -287,8 +287,11 @@ async def _update_search_analytics(query: str, result_count: int, processing_tim
     Update search analytics in the background
     """
     try:
+        logger.info(f"📊 Updating analytics for search {search_id}: query='{query[:30]}...', results={result_count}")
+        
         # Increment total searches
-        redis_client.client.incr("stats:total_searches")
+        new_total = redis_client.client.incr("stats:total_searches")
+        logger.info(f"📊 Total searches incremented to: {new_total}")
         
         # Add to popular queries (with score increment)
         redis_client.client.zincrby("stats:popular_queries", 1, query)
@@ -313,7 +316,8 @@ async def _update_search_analytics(query: str, result_count: int, processing_tim
         redis_client.client.lpush("logs:searches", json.dumps(search_log))
         redis_client.client.ltrim("logs:searches", 0, 999)  # Keep last 1000 searches
         
-        logger.debug(f"Updated analytics for search {search_id}")
+        logger.info(f"✅ Analytics updated successfully for search {search_id}")
         
     except Exception as e:
-        logger.error(f"Failed to update search analytics: {e}")
+        logger.error(f"❌ Failed to update search analytics: {e}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
