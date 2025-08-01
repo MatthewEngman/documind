@@ -43,7 +43,7 @@ const SearchInterface: React.FC<SearchInterfaceProps> = ({ onResultClick }) => {
     try {
       const result = await searchApi.search(searchQuery, {
         limit: 20,
-        similarity_threshold: 0.3,
+        similarity_threshold: 0.1,
         use_cache: true,
       });
 
