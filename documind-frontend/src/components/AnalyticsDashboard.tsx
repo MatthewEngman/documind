@@ -31,13 +31,17 @@ const AnalyticsDashboard: React.FC = () => {
   const isLoading = searchLoading || systemLoading;
   const hasErrors = searchError || systemError;
 
-  // Safe data extraction with defaults
-  const totalSearches = searchAnalytics?.search_performance?.total_searches || 0;
-  const cacheHitRate = searchAnalytics?.search_performance?.cache_hit_rate || 0;
-  const totalVectors = searchAnalytics?.vector_search?.total_vectors || 0;
+  // Safe data extraction with correct field names from backend API
+  const totalSearches = systemStats?.search?.total_searches || 0;
+  const cacheHitRate = systemStats?.search?.cache_hit_rate || 0;
+  const totalVectors = searchAnalytics?.vector_stats?.total_vectors || 0;
   const memoryUsed = systemStats?.redis?.memory_used || '0B';
   const totalKeys = systemStats?.redis?.total_keys || 0;
   const redisConnected = systemStats?.system?.redis_connected || false;
+  
+  // OpenAI and service status from correct backend fields
+  const openaiAvailable = systemStats?.services?.openai_available || false;
+  const localModelAvailable = systemStats?.services?.local_model_available || false;
 
   const StatCard: React.FC<{
     title: string;
@@ -171,14 +175,14 @@ const AnalyticsDashboard: React.FC = () => {
           
           <div className="text-center">
             <div className="text-lg font-bold text-gray-900">
-              {searchAnalytics?.embedding_service?.openai_available ? '✅' : '⚠️'}
+              {openaiAvailable ? '✅' : '⚠️'}
             </div>
             <div className="text-xs text-gray-600">OpenAI</div>
           </div>
           
           <div className="text-center">
             <div className="text-lg font-bold text-gray-900">
-              {searchAnalytics?.embedding_service?.local_model_available ? '✅' : '❌'}
+              {localModelAvailable ? '✅' : '❌'}
             </div>
             <div className="text-xs text-gray-600">Local Model</div>
           </div>

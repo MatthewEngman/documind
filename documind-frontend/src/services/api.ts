@@ -102,6 +102,16 @@ export interface SystemStats {
     processed_documents: number;
     total_chunks: number;
   };
+  search: {
+    total_searches: number;
+    cache_hits: number;
+    cache_hit_rate: number;
+  };
+  services: {
+    openai_available: boolean;
+    local_model_available: boolean;
+    redis_connected: boolean;
+  };
 }
 
 export interface SearchAnalytics {
@@ -112,6 +122,11 @@ export interface SearchAnalytics {
     cache_hit_rate: number;
   };
   vector_search: {
+    status: string;
+    total_docs: number;
+    total_vectors: number;
+  };
+  vector_stats: {
     status: string;
     total_docs: number;
     total_vectors: number;
@@ -200,7 +215,7 @@ export const searchApi = {
     const response = await apiClient.post('/api/search/', {
       query,
       limit: options.limit || 10,
-      similarity_threshold: options.similarity_threshold || 0.7,
+      similarity_threshold: options.similarity_threshold || 0.1,
       filters: options.filters,
       use_cache: options.use_cache !== false,
     });
