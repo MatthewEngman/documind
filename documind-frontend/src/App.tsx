@@ -51,21 +51,35 @@ function App() {
             {/* Condensed Redis Showcase */}
             <RedisShowcase />
             
-            {/* Main Dashboard Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-              {/* Left Column - Upload and Search */}
-              <div className="lg:col-span-2 space-y-8">
-                {/* Document Upload Section */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    Upload Documents
-                  </h2>
-                  <DocumentUpload onUploadSuccess={handleUploadSuccess} />
-                </div>
+            {/* Improved Vertical Layout - Industry Best Practices */}
+            <div className="space-y-8 mt-8">
+              {/* Document Upload Section - Primary Action at Top */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  Upload Documents
+                </h2>
+                <DocumentUpload onUploadSuccess={handleUploadSuccess} />
+              </div>
 
+              {/* Document List Section - Full Width, No Scrolling */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Documents
+                </h2>
+                <DocumentList 
+                  refreshTrigger={refreshTrigger}
+                  onDocumentSelect={handleDocumentSelect}
+                />
+              </div>
+
+              {/* Bottom Row - Search and Analytics Side by Side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Search Interface Section */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
@@ -75,23 +89,6 @@ function App() {
                     Semantic Search
                   </h2>
                   <SearchInterface onResultClick={handleSearchResultClick} />
-                </div>
-              </div>
-
-              {/* Right Column - Documents and Analytics */}
-              <div className="space-y-8">
-                {/* Document List Section */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Documents
-                  </h2>
-                  <DocumentList 
-                    refreshTrigger={refreshTrigger}
-                    onDocumentSelect={handleDocumentSelect}
-                  />
                 </div>
 
                 {/* Analytics Section */}
