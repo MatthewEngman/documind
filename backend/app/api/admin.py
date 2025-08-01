@@ -78,36 +78,33 @@ async def debug_redis():
 
 @router.get("/debug-env")
 async def debug_environment():
-    """Debug environment variables and OpenAI configuration"""
+    """Debug environment variables and OpenAI configuration - SECURE VERSION"""
     import os
     from app.config import settings
     
     try:
-        # Check environment variables
+        # Check environment variables (SECURE - no sensitive data exposed)
         env_openai_key = os.getenv('OPENAI_API_KEY')
-        env_redis_host = os.getenv('REDIS_HOST')
         env_redis_required = os.getenv('REDIS_REQUIRED')
         
-        # Check settings
+        # Check settings (SECURE - no sensitive data exposed)
         settings_openai_key = settings.openai_api_key
         
         return {
             "environment_variables": {
                 "OPENAI_API_KEY": "present" if env_openai_key else "missing",
-                "OPENAI_API_KEY_length": len(env_openai_key) if env_openai_key else 0,
-                "OPENAI_API_KEY_prefix": env_openai_key[:10] if env_openai_key else None,
-                "REDIS_HOST": env_redis_host,
                 "REDIS_REQUIRED": env_redis_required
             },
             "settings": {
                 "openai_api_key": "present" if settings_openai_key else "missing",
-                "openai_api_key_length": len(settings_openai_key) if settings_openai_key else 0,
-                "openai_api_key_prefix": settings_openai_key[:10] if settings_openai_key else None,
                 "embedding_model": settings.embedding_model,
-                "redis_host": settings.redis_host,
                 "redis_required": settings.redis_required
             },
-            "keys_match": env_openai_key == settings_openai_key if env_openai_key and settings_openai_key else False
+            "configuration_status": {
+                "openai_configured": bool(settings_openai_key),
+                "redis_required": settings.redis_required,
+                "keys_match": env_openai_key == settings_openai_key if env_openai_key and settings_openai_key else False
+            }
         }
         
     except Exception as e:
