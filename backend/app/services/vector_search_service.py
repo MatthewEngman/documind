@@ -384,19 +384,26 @@ class VectorSearchService:
         
         for result in results:
             try:
-                # Calculate actual similarity if not already present
-                if "similarity" not in result:
-                    if "vector" in result:
-                        doc_vector = self._deserialize_vector(result["vector"])
-                        similarity = embedding_service.calculate_similarity(query_vector, doc_vector)
-                    else:
-                        similarity = 1.0 - float(result.get("score", 1.0))  # Convert distance to similarity
-                else:
+                # Use already-calculated similarity if present (from fallback search)
+                if "similarity" in result:
                     similarity = float(result["similarity"])
+                    logger.info(f"🔍 Using existing similarity for {result.get('id', 'unknown')}: {similarity:.4f}")
+                elif "vector" in result:
+                    # Only recalculate if no similarity was provided
+                    doc_vector = self._deserialize_vector(result["vector"])
+                    similarity = embedding_service.calculate_similarity(query_vector, doc_vector)
+                    logger.info(f"🔍 Recalculated similarity for {result.get('id', 'unknown')}: {similarity:.4f}")
+                else:
+                    # Convert distance to similarity as fallback
+                    similarity = 1.0 - float(result.get("score", 1.0))
+                    logger.info(f"🔍 Converted score to similarity for {result.get('id', 'unknown')}: {similarity:.4f}")
                 
-                # Apply similarity threshold
+                # Apply similarity threshold with logging
                 if similarity < threshold:
+                    logger.info(f"⚠️ Filtering out result {result.get('id', 'unknown')}: similarity {similarity:.4f} < threshold {threshold}")
                     continue
+                else:
+                    logger.info(f"✅ Keeping result {result.get('id', 'unknown')}: similarity {similarity:.4f} >= threshold {threshold}")
                 
                 # Enhance result data
                 enhanced_result = {
