@@ -118,7 +118,26 @@ async def search_documents(query: SearchQuery, background_tasks: BackgroundTasks
                 json.dumps(cache_data)
             )
         
-        # Update analytics in background
+        # Update analytics immediately (more reliable than background tasks)
+        logger.info(f"📊 Updating analytics immediately for search {search_id}")
+        try:
+            # Increment total searches immediately
+            new_total = redis_client.client.incr("stats:total_searches")
+            logger.info(f"📊 Total searches incremented to: {new_total}")
+            
+            # Add to popular queries
+            redis_client.client.zincrby("stats:popular_queries", 1, query.query)
+            
+            # Add response time
+            redis_client.client.lpush("stats:response_times", processing_time)
+            redis_client.client.ltrim("stats:response_times", 0, 999)
+            
+            logger.info(f"✅ Analytics updated immediately for search {search_id}")
+        except Exception as analytics_error:
+            logger.error(f"❌ Immediate analytics update failed: {analytics_error}")
+        
+        # Also add background task as backup
+        logger.info(f"🔄 Adding background task as backup for search {search_id}")
         background_tasks.add_task(
             _update_search_analytics,
             query.query,
