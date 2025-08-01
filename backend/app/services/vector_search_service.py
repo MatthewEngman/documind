@@ -169,18 +169,9 @@ class VectorSearchService:
             query_embedding = await embedding_service.generate_embedding(query)
             query_vector = query_embedding["vector"]
             
-            # Try Redis Stack vector search first
-            try:
-                results = await self._execute_redis_stack_search(np.array(query_vector, dtype=np.float32), limit, filters)
-                if results:
-                    logger.info(f"✅ Redis Stack search successful: {len(results)} results")
-                else:
-                    raise Exception("No results from Redis Stack search")
-            except Exception as e:
-                logger.error(f"❌ Redis Stack vector search failed: {e}")
-                # Fallback to manual vector search
-                logger.info("🔧 Using fallback vector search")
-                results = await self._execute_fallback_search(np.array(query_vector, dtype=np.float32), limit, filters)
+            # Use optimized fallback vector search (Redis Stack KNN syntax incompatible with production version)
+            logger.info("🚀 Using optimized fallback vector search (faster than Redis Stack attempts)")
+            results = await self._execute_fallback_search(np.array(query_vector, dtype=np.float32), limit, filters)
             
             # If no vectors found, return demo results for reliable demonstration
             if not results:

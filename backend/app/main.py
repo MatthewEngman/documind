@@ -226,7 +226,7 @@ async def load_demo_data():
 # System statistics endpoint
 @app.get("/api/system/stats")
 async def get_system_stats():
-    """Get system statistics"""
+    """Get comprehensive system statistics including search analytics"""
     try:
         redis_stats = redis_client.get_stats()
         
@@ -240,8 +240,26 @@ async def get_system_stats():
             
             processed_docs = redis_client.client.get("stats:documents_processed") or 0
             chunks_created = redis_client.client.get("stats:chunks_created") or 0
+            
+            # Get search analytics
+            total_searches = int(redis_client.client.get("stats:total_searches") or 0)
+            cache_hits = int(redis_client.client.get("stats:cache_hits") or 0)
         else:
             total_docs = processed_docs = chunks_created = 0
+            total_searches = cache_hits = 0
+        
+        # Get embedding service status
+        try:
+            embedding_stats = embedding_service.get_embedding_stats()
+            openai_available = embedding_stats.get("openai_available", False)
+            local_model_available = embedding_stats.get("local_model_available", False)
+        except Exception as e:
+            logger.warning(f"Embedding stats error: {e}")
+            openai_available = False
+            local_model_available = False
+        
+        # Calculate cache hit rate
+        cache_hit_rate = round(cache_hits / max(total_searches, 1) * 100, 2) if total_searches > 0 else 0
         
         return {
             "system": {
@@ -253,6 +271,16 @@ async def get_system_stats():
                 "total_documents": int(total_docs),
                 "processed_documents": int(processed_docs),
                 "total_chunks": int(chunks_created)
+            },
+            "search": {
+                "total_searches": total_searches,
+                "cache_hits": cache_hits,
+                "cache_hit_rate": cache_hit_rate
+            },
+            "services": {
+                "openai_available": openai_available,
+                "local_model_available": local_model_available,
+                "redis_connected": redis_client.health_check()
             }
         }
         
