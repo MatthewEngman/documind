@@ -169,10 +169,18 @@ class VectorSearchService:
             query_embedding = await embedding_service.generate_embedding(query)
             query_vector = query_embedding["vector"]
             
-            # Skip Redis Stack KNN (incompatible version) - use reliable fallback
-            logger.info("🔧 Using reliable fallback vector search (Redis Stack KNN incompatible)")
-            
-            results = await self._execute_fallback_search(np.array(query_vector, dtype=np.float32), limit, filters)
+            # Try Redis Stack vector search first
+            try:
+                results = await self._execute_redis_stack_search(np.array(query_vector, dtype=np.float32), limit, filters)
+                if results:
+                    logger.info(f"✅ Redis Stack search successful: {len(results)} results")
+                else:
+                    raise Exception("No results from Redis Stack search")
+            except Exception as e:
+                logger.error(f"❌ Redis Stack vector search failed: {e}")
+                # Fallback to manual vector search
+                logger.info("🔧 Using fallback vector search")
+                results = await self._execute_fallback_search(np.array(query_vector, dtype=np.float32), limit, filters)
             
             # If no vectors found, return demo results for reliable demonstration
             if not results:
@@ -415,7 +423,7 @@ class VectorSearchService:
                     "similarity_score": round(similarity, 4),
                     "word_count": int(result.get("word_count", 0)),
                     "chunk_index": int(result.get("chunk_index", 0)),
-                    "tags": result.get("tags", "").split("|") if result.get("tags") else [],
+                    "tags": self._process_tags(result.get("tags", [])),
                     "upload_date": result.get("upload_date", ""),
                     "embedding_method": result.get("embedding_method", ""),
                     "search_score": float(result.get("score", 0.0))
@@ -620,6 +628,22 @@ class VectorSearchService:
         except Exception as e:
             logger.error(f"Error calculating cosine similarity: {e}")
             return 0.0
+    
+    def _process_tags(self, tags_data) -> List[str]:
+        """Process tags data that might be a string or list"""
+        try:
+            if isinstance(tags_data, list):
+                return tags_data
+            elif isinstance(tags_data, str):
+                if tags_data:
+                    return tags_data.split("|")
+                else:
+                    return []
+            else:
+                return []
+        except Exception as e:
+            logger.error(f"Error processing tags: {e}")
+            return []
     
     def _generate_demo_results(self, query: str, limit: int = 3) -> List[Dict]:
         """Generate demo results when search fails"""

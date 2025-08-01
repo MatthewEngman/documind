@@ -1,23 +1,24 @@
 # 5-Minute Demo Script for Redis AI Challenge Judges
 
-## 🎬 Live Demo: https://documind-redis-challenge.vercel.app
+## 🎬 Live Demo: https://documind-ruby.vercel.app
 
 ### 1. Introduction (30 seconds)
-"DocuMind is a semantic document cache powered by Redis 8's Vector Sets. It transforms static document storage into an intelligent, searchable knowledge base."
+"DocuMind is a semantic document cache powered by Redis 8's Vector Sets. It transforms static document storage into an intelligent, searchable knowledge base with real semantic search capabilities."
 
 ### 2. Document Upload Demo (1 minute)
-- Visit live demo URL
-- Drag and drop a sample PDF
-- Show real-time processing progress
-- Point out vector generation step
-- Highlight Redis storage of chunks + metadata
+- Visit live demo URL: https://documind-ruby.vercel.app
+- Drag and drop a sample PDF or document
+- Show real-time processing progress with status updates
+- Point out vector generation step using OpenAI embeddings
+- Highlight Redis storage of chunks + metadata + base64-encoded vectors
 
 ### 3. Semantic Search Demo (2 minutes)
-- Search: "API security best practices"
-- Show instant, relevant results
-- Point out similarity scores and highlighting
-- Try another search to demonstrate caching
-- Show sub-100ms cached response time
+- Search: "Innovation" or "API security" or "technology trends"
+- Show instant, relevant results from actual uploaded documents
+- Point out similarity scores (typically 20-30% for semantic matches)
+- Highlight text snippets with search term highlighting
+- Try another search to demonstrate semantic understanding
+- Show sub-second response times with fallback vector search
 
 ### 4. Redis Innovation Showcase (1 minute)
 - Switch to Analytics tab
