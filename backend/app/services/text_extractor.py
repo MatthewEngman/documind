@@ -1,4 +1,4 @@
-import PyPDF2
+import pypdf
 import pdfplumber
 from docx import Document
 import markdown
@@ -78,7 +78,7 @@ class TextExtractor:
                             continue
             
             if not text_content:
-                # Fallback to PyPDF2
+                # Fallback to pypdf
                 return await self._extract_pdf_fallback(file_content, filename)
             
             full_text = "\n\n".join(text_content)
@@ -91,17 +91,17 @@ class TextExtractor:
             }
             
         except Exception as e:
-            logger.warning(f"pdfplumber failed for {filename}: {e}, trying PyPDF2")
+            logger.warning(f"pdfplumber failed for {filename}: {e}, trying pypdf")
             return await self._extract_pdf_fallback(file_content, filename)
     
     async def _extract_pdf_fallback(self, file_content: bytes, filename: str) -> Dict:
-        """Fallback PDF extraction using PyPDF2"""
+        """Fallback PDF extraction using pypdf"""
         try:
             text_content = []
             page_count = 0
             
             with io.BytesIO(file_content) as pdf_buffer:
-                pdf_reader = PyPDF2.PdfReader(pdf_buffer)
+                pdf_reader = pypdf.PdfReader(pdf_buffer)
                 page_count = len(pdf_reader.pages)
                 
                 for page_num, page in enumerate(pdf_reader.pages):
@@ -119,7 +119,7 @@ class TextExtractor:
                 "success": True,
                 "text": full_text,
                 "page_count": page_count,
-                "extractor": "PyPDF2"
+                "extractor": "pypdf"
             }
             
         except Exception as e:
