@@ -26,6 +26,7 @@ const queryClient = new QueryClient({
 function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [showDocumentDetails, setShowDocumentDetails] = useState(false);
 
