@@ -20,6 +20,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ label, value, icon, color = "fr
 );
 
 export const PerformanceMetrics: React.FC = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [metrics, setMetrics] = useState({
     searchSpeed: '< 100ms',
     cacheHitRate: '80%',

@@ -170,7 +170,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadSuccess }) => {
     };
 
     await processFilesConcurrently();
-  }, [onUploadSuccess]); // Remove uploads.length dependency to prevent recreation
+  }, [onUploadSuccess, uploads]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
